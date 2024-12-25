@@ -78,28 +78,5 @@ refresh_interval = 0.05   # 새로고침 간격(초)
 poetry run python main.py
 ```
 
-## Security
-- config.ini 파일에 개인정보가 포함되어 있으므로 절대 공개 저장소에 업로드하지 마세요
-- refresh_interval 값을 너무 낮게 설정하면 IP 차단될 수 있습니다
-- 브라우저 자동화 탐지를 피하기 위해 불필요한 자동화는 자제해주세요
-
-## Issues
-버그를 발견하셨거나 새로운 기능을 제안하고 싶으시다면:
-1. GitHub Issues 페이지를 확인해 주세요
-2. 이미 보고된 이슈가 없다면 새로운 이슈를 생성해 주세요
-3. 가능한 한 자세한 재현 방법과 오류 메시지를 포함해 주세요
-
-## Contributing
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## Version History
-- v1.0.0 (2024-01-01)
-  - 최초 릴리즈
-  - 기본적인 예매 자동화 기능 구현
-
 ## License
 MIT License
