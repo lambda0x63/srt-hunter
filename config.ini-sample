@@ -1,0 +1,26 @@
+[LOGIN]
+id = your_srt_number
+password = your_srt_password
+
+[PERSONAL]
+phone = 01012345678
+birth = 990110
+
+[TRAIN] 
+; 출발역(예: 동대구)
+departure = 동대구
+; 도착역(예: 수서)
+arrival = 수서
+
+; 날짜 형식은 반드시 'YYYY/MM/DD(요일)' 형식으로 입력
+date = 2024/12/28(토)
+
+; 시간은 반드시 두 자리 짝수로 입력 (00, 02, 04, ..., 22,)
+target_time = 08
+
+; 허용 시간 범위 (분 단위)
+time_tolerance = 120
+
+[SETTINGS]
+; 새로고침 간격 (초)
+refresh_interval = 0.05

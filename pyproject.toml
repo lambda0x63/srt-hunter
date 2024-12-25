@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "srt-hunter"
+version = "0.1.0"
+description = "SRT auto booking"
+authors = ["faith6"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+selenium = "^4.27.1"
+pyautogui = "^0.9.54"
+webdriver-manager = "^4.0.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
