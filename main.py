@@ -21,7 +21,7 @@ def load_config():
     config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
     if not os.path.exists(config_path):
         raise FileNotFoundError("config.ini 파일을 찾을 수 없습니다.")
-    config.read(config_path)
+    config.read(config_path, encoding='utf-8')
     return config
 
 def parse_train_info(row):
