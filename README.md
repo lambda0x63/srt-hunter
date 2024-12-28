@@ -1,10 +1,12 @@
 # SRT-Hunter
 
-SRT 1-person ticketing automation script
+SRT 1-person ticketing automation program (v1.0.0)
+> CLI version(v0.1.0) to GUI version(v1.0.0)
 
 ## Notice
 - 개인 사용 목적 한정
-- 과도한 새로고침 시 서버 부하 유발 가능
+- 과도한 새로고침 시 서버 부하 발생 가능성
+- 카카오페이 간편결제 지원 (결제요청이후 10분이내 결제 필요)
 
 ## Requirements
 - Chrome 브라우저
@@ -12,35 +14,18 @@ SRT 1-person ticketing automation script
 - Poetry
 
 ## Features
-- SRT 자동 로그인
-- 지정 시간대 티켓 자동 검색
-- 예매 가능석 자동 예매
-- 카카오페이 결제 연동
+- GUI 기반 인터페이스
+- SRT 자동 로그인 기능
+- 출발/도착역 선택 기능
+- 날짜/시간대 자동 필터링 기능
+- 실시간 예매 진행상황 모니터링
+- 카카오페이 자동결제 연동
+- 스마트폰 발권 자동화
 
-## Process
-1. 로그인
-   - SRT 웹사이트 접속
-   - 회원번호/비밀번호 로그인
+## TODO
 
-2. 승차권 검색
-   - 출발/도착역 설정
-   - 날짜/시간대 설정
-   - 자동 새로고침
+- [X] GUI 
 
-3. 예매
-   - 예약 가능석 발견 시 자동 예매
-   - 지정 시간 범위 내 열차 선택
-   - 스마트폰 발권 자동 설정
-
-4. 결제
-   - 카카오페이 결제 선택
-   - 개인정보 자동 입력
-   - 결제 요청 발송
-
-## Todo
-- [ ] 좌석 등급 선택
-- [ ] 결제 수단 다양화
-- [ ] GUI 개발
 
 ## Installation
 ```bash
@@ -49,34 +34,36 @@ cd srt-hunter
 poetry install
 ```
 
-## Configuration
-1. `config.ini-sample` → `config.ini` 복사
-2. `config.ini` 정보 입력
-
-```ini
-[LOGIN]
-id = your_srt_number        # SRT 회원번호
-password = your_srt_password # 비밀번호
-
-[PERSONAL]
-phone = 01012345678        # 휴대폰번호
-birth = 990110            # 생년월일(YYMMDD)
-
-[TRAIN]
-departure = 동대구         # 출발역
-arrival = 수서            # 도착역
-date = 2024/12/28(토)    # 날짜(YYYY/MM/DD(요일))
-target_time = 08         # 출발시간(짝수: 00, 02, ..., 22)
-time_tolerance = 120     # 시간허용범위(분)
-
-[SETTINGS]
-refresh_interval = 0.05   # 새로고침 간격(초)
-```
-
 ## Usage
 ```bash
 poetry run python main.py
 ```
+
+## Process
+1. 로그인 정보 입력
+   - SRT 회원번호 입력
+   - SRT 비밀번호 입력
+
+2. 결제 정보 입력
+   - 휴대폰번호 11자리 입력
+   - 생년월일 6자리 입력
+
+3. 예매 정보 설정
+   - 출발역/도착역 선택
+   - 날짜 선택 (27일 이내)
+   - 출발 시간 선택 (짝수 시간대)
+   - 허용 시간 범위 입력 (분)
+   - 새로고침 간격 입력 (초)
+
+4. 예매 진행
+   - 예매 시작 버튼 클릭
+   - 실시간 진행상황 확인
+   - 중지 버튼으로 진행 중단
+
+## Caution
+- 0.05초 이상 새로고침 간격 권장
+- 로그인 및 결제 정보 메모리에서만 처리 (파일 저장 없음)
+- Chrome 브라우저 유지
 
 ## License
 MIT License
