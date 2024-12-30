@@ -395,7 +395,6 @@ class MainWindow(QMainWindow):
             "%Y/%m/%d %H:%M"
         )
 
-        # 선택된 날짜가 오늘이고, 선택된 시간대가 현재 시간대보다 2시간 이상 이전인 경우에만 거부
         if selected_datetime.date() == current_time.date():
             current_hour_block = (current_time.hour // 2) * 2
             selected_hour = selected_datetime.hour
