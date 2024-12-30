@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QLabel, QLineEdit, QComboBox, QPushButton, QGroupBox, 
-                           QGridLayout, QTextEdit, QProgressBar, QMessageBox, QHBoxLayout)
+                           QGridLayout, QTextEdit, QProgressBar, QMessageBox, QHBoxLayout, QCheckBox)
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QDate
 from PyQt6.QtGui import QFont
 import qdarkstyle
@@ -181,24 +181,38 @@ class MainWindow(QMainWindow):
         settings_layout = QGridLayout()
         settings_layout.setSpacing(10)
         
+        # 좌석 유형 선택 옵션 추가
+        seat_type_label = QLabel("좌석 유형:")
+        self.special_seat = QCheckBox("특실")
+        self.general_seat = QCheckBox("일반실")
+        self.standing_seat = QCheckBox("입석+좌석")
+        
+        seat_type_layout = QHBoxLayout()
+        seat_type_layout.addWidget(self.special_seat)
+        seat_type_layout.addWidget(self.general_seat)
+        seat_type_layout.addWidget(self.standing_seat)
+        
+        settings_layout.addWidget(seat_type_label, 0, 0)
+        settings_layout.addLayout(seat_type_layout, 0, 1)
+        
         self.time_tolerance_input = QLineEdit()
         self.refresh_interval_input = QLineEdit()
         self.time_tolerance_input.setPlaceholderText("30")
         self.refresh_interval_input.setPlaceholderText("0.05")
         
-        settings_layout.addWidget(QLabel("허용 시간 범위(분):"), 0, 0)
-        settings_layout.addWidget(self.time_tolerance_input, 0, 1)
-        settings_layout.addWidget(QLabel("새로고침 간격(초):"), 1, 0)
-        settings_layout.addWidget(self.refresh_interval_input, 1, 1)
+        settings_layout.addWidget(QLabel("허용 시간 범위(분):"), 1, 0)
+        settings_layout.addWidget(self.time_tolerance_input, 1, 1)
+        settings_layout.addWidget(QLabel("새로고침 간격(초):"), 2, 0)
+        settings_layout.addWidget(self.refresh_interval_input, 2, 1)
         
         # 도움말 텍스트 추가
         help_text = QLabel("* 허용 시간 범위: 선택한 시간부터 해당 시간만큼 이후까지 예매를 시도 (예: 14시 선택, 30분 설정시 14:00~14:30)")
         help_text.setWordWrap(True)  # 긴 텍스트 자동 줄바꿈
-        settings_layout.addWidget(help_text, 2, 0, 1, 2)
+        settings_layout.addWidget(help_text, 3, 0, 1, 2)
         
         refresh_help = QLabel("* 새로고침 간격: 0.05 ~ 0.1초 권장")
         refresh_help.setWordWrap(True)
-        settings_layout.addWidget(refresh_help, 3, 0, 1, 2)
+        settings_layout.addWidget(refresh_help, 4, 0, 1, 2)
         
         settings_group.setLayout(settings_layout)
         right_column.addWidget(settings_group)
@@ -284,7 +298,12 @@ class MainWindow(QMainWindow):
                 'arrival': self.arr_stn.currentText(),
                 'date': date_str,
                 'target_time': time_str,
-                'time_tolerance': self.time_tolerance_input.text() or "30"
+                'time_tolerance': self.time_tolerance_input.text() or "30",
+                'seat_types': {
+                    'special': self.special_seat.isChecked(),
+                    'general': self.general_seat.isChecked(),
+                    'standing': self.standing_seat.isChecked()
+                }
             },
             'SETTINGS': {
                 'refresh_interval': self.refresh_interval_input.text() or "0.05"
@@ -315,6 +334,16 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "입력 오류", "출발역과 도착역이 동일합니다.")
             return False
         
+        # 좌석 유형 검증
+        if not (self.special_seat.isChecked() or self.general_seat.isChecked() or self.standing_seat.isChecked()):
+            QMessageBox.warning(self, "입력 오류", "최소한 하나의 좌석 유형을 선택해주세요.")
+            return False
+            
+        # 일반실이 선택되지 않았는데 입석+좌석이 선택된 경우
+        if not self.general_seat.isChecked() and self.standing_seat.isChecked():
+            QMessageBox.warning(self, "입력 오류", "입석+좌석은 일반실이 선택된 경우에만 선택할 수 있습니다.")
+            return False
+            
         # 전화번호 형식 검사
         phone = self.phone_input.text()
         if not phone.isdigit() or len(phone) != 11:

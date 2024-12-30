@@ -37,25 +37,30 @@ def parse_train_info(row):
         dep_time = cols[3].find_element(By.CLASS_NAME, "time").text  # 출발시간
         arr_time = cols[4].find_element(By.CLASS_NAME, "time").text  # 도착시간
         
-        # 일반실 예약 버튼 찾기
-        reserve_button = None
-        general_button = cols[6].find_elements(By.CSS_SELECTOR, "a[href='#none'] span")
-        if general_button and general_button[0].text == "예약하기":
-            reserve_button = general_button[0].find_element(By.XPATH, "./..")  # 부모 a 태그
+        # 특실 예약 버튼 찾기
+        special_button = None
+        special_spans = cols[5].find_elements(By.CSS_SELECTOR, "a[href='#none'] span")
+        if special_spans and special_spans[0].text == "예약하기":
+            special_button = special_spans[0].find_element(By.XPATH, "./..")
         
-        # 일반실이 없으면 특실 예약 버튼 찾기
-        if not reserve_button:
-            special_button = cols[5].find_elements(By.CSS_SELECTOR, "a[href='#none'] span")
-            if special_button and special_button[0].text == "예약하기":
-                reserve_button = special_button[0].find_element(By.XPATH, "./..")  # 부모 a 태그
+        # 일반실 예약 버튼 찾기
+        general_button = None
+        standing_button = None
+        general_spans = cols[6].find_elements(By.CSS_SELECTOR, "a[href='#none'] span")
+        for span in general_spans:
+            if span.text == "예약하기":
+                general_button = span.find_element(By.XPATH, "./..")
+            elif span.text == "입석+좌석":
+                standing_button = span.find_element(By.XPATH, "./..")
         
         return {
             'type': train_type,
             'number': train_number,
             'dep_time': dep_time,
             'arr_time': arr_time,
-            'has_reserve_button': reserve_button is not None,
-            'reserve_button': reserve_button
+            'special_button': special_button,
+            'general_button': general_button,
+            'standing_button': standing_button
         }
     except Exception as e:
         print(f"열차 정보 파싱 중 오류: {str(e)}")
@@ -69,7 +74,7 @@ def time_diff_minutes(time1, time2):
     h2, m2 = map(int, time2.split(':'))
     return abs((h1 * 60 + m1) - (h2 * 60 + m2))
 
-def find_available_train(driver, wait, target_time, time_tolerance):
+def find_available_train(driver, wait, target_time, time_tolerance, seat_types):
     """
     허용 시간 내의 예약 가능한 열차를 찾는 함수
     """
@@ -95,14 +100,29 @@ def find_available_train(driver, wait, target_time, time_tolerance):
             if time_difference > time_tolerance:
                 continue
                 
-            # 예약 가능한지 확인
-            if train_info['has_reserve_button']:
+            # 선택된 좌석 유형에 따라 예약 가능 여부 확인
+            available_buttons = []
+            
+            if seat_types['special'] and train_info['special_button']:
+                available_buttons.append(('특실', train_info['special_button']))
+                
+            if seat_types['general'] and train_info['general_button']:
+                available_buttons.append(('일반실', train_info['general_button']))
+                
+            if seat_types['standing'] and train_info['standing_button']:
+                available_buttons.append(('입석+좌석', train_info['standing_button']))
+                
+            if available_buttons:
                 train_info['time_diff'] = time_difference
+                train_info['available_buttons'] = available_buttons
                 available_trains.append(train_info)
         
         # 시간 차이가 가장 적은 열차 선택
         if available_trains:
-            return min(available_trains, key=lambda x: x['time_diff'])
+            best_train = min(available_trains, key=lambda x: x['time_diff'])
+            # 선택된 좌석 유형 중 가장 우선순위가 높은 것 선택 (특실 > 일반실 > 입석+좌석)
+            best_train['reserve_button'] = best_train['available_buttons'][0][1]
+            return best_train
         
         return None
         
@@ -132,7 +152,8 @@ def search_and_reserve(driver, wait, config, progress_signal=None):
             # 허용 시간 내의 예약 가능한 열차 찾기
             target_time = config['TRAIN']['target_time']
             time_tolerance = int(config['TRAIN']['time_tolerance'])
-            available_train = find_available_train(driver, wait, target_time, time_tolerance)
+            seat_types = config['TRAIN']['seat_types']
+            available_train = find_available_train(driver, wait, target_time, time_tolerance, seat_types)
             
             if available_train:
                 log(f"\n예약 가능한 열차를 찾았습니다!")
@@ -143,6 +164,16 @@ def search_and_reserve(driver, wait, config, progress_signal=None):
                 # 예약하기 버튼 클릭
                 available_train['reserve_button'].click()
                 log("예약하기 버튼 클릭 완료")
+                
+                # 입석+좌석 선택 시 발생하는 alert 처리
+                try:
+                    alert = driver.switch_to.alert
+                    alert_text = alert.text
+                    if "입석+좌석 승차권은 '스마트폰 발권'이 불가합니다" in alert_text:
+                        alert.accept()
+                        log("입석+좌석 안내 확인")
+                except:
+                    pass  # alert가 없는 경우 무시
                 
                 # 결제하기 버튼 클릭
                 quick_wait = WebDriverWait(driver, 5)
