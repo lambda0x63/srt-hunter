@@ -12,7 +12,9 @@ import os
 
 def setup_driver():
     service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service)
+    options = webdriver.ChromeOptions()
+    options.add_argument('--start-maximized')
+    driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 10)
     return driver, wait
 
@@ -108,18 +110,13 @@ def find_available_train(driver, wait, target_time, time_tolerance):
         print(f"열차 검색 중 오류: {str(e)}")
         return None
 
-def search_and_reserve(driver, wait, config, progress_signal=None, is_running=None):
+def search_and_reserve(driver, wait, config, progress_signal=None):
     def log(message):
         if progress_signal:
             progress_signal.emit(message)
-        print(message)  # 콘솔 출력도 유지
+        print(message)
         
     while True:
-        # 중지 요청 확인
-        if is_running is not None and not is_running:
-            log("예매 시도가 중단되었습니다.")
-            return False
-            
         try:
             # 조회하기 버튼 클릭
             log("\n새로운 검색 시도...")
@@ -199,12 +196,14 @@ def search_and_reserve(driver, wait, config, progress_signal=None, is_running=No
                 # 휴대폰 번호 입력
                 phone_input = quick_wait.until(EC.presence_of_element_located(
                     (By.XPATH, "/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[1]/div/div/span/input")))
+                phone_input.clear()
                 phone_input.send_keys(config['PERSONAL']['phone'])
                 log("휴대폰 번호 입력 완료")
 
                 # 생년월일 입력
                 birth_input = quick_wait.until(EC.presence_of_element_located(
                     (By.XPATH, "/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[2]/div/div/span/input")))
+                birth_input.clear()
                 birth_input.send_keys(config['PERSONAL']['birth'])
                 log("생년월일 입력 완료")
 
@@ -214,27 +213,57 @@ def search_and_reserve(driver, wait, config, progress_signal=None, is_running=No
                 final_request_button.click()
                 log("최종 결제요청 완료")
 
+                # 결제 완료될 때까지 대기 (최대 600초 = 10분)
+                payment_wait = WebDriverWait(driver, 600)
+                try:
+                    # 휴대폰 결제 확인 화면이 나타날 때까지 대기
+                    payment_wait.until(EC.presence_of_element_located(
+                        (By.XPATH, "//div[contains(text(), '휴대폰에서 카카오페이 결제후,')]")))
+                    log("휴대폰에서 카카오페이 결제를 진행해주세요. (제한시간: 10분)")
+                    
+                    # 결제가 완료될 때까지 계속 대기
+                    while True:
+                        try:
+                            # 현재 URL이 SRT 도메인으로 변경되었는지 확인
+                            current_url = driver.current_url
+                            if "srail.kr" in current_url:
+                                log("결제가 완료되었습니다!")
+                                break
+                            time.sleep(1)
+                        except:
+                            time.sleep(1)
+                except TimeoutException:
+                    log("결제 시간이 초과되었습니다. (10분 경과)")
+                    # 계속 대기
+                    while True:
+                        try:
+                            current_url = driver.current_url
+                            if "srail.kr" in current_url:
+                                log("결제가 완료되었습니다!")
+                                break
+                            time.sleep(1)
+                        except:
+                            time.sleep(1)
+
                 return True
             
             log("예약 가능한 열차가 없습니다. 잠시 후 다시 시도합니다...")
             time.sleep(float(config['SETTINGS']['refresh_interval']))
-            
+                
         except Exception as e:
             log(f"검색 중 오류 발생: {str(e)}")
+            if "Connection aborted" in str(e) or "Failed to establish" in str(e):
+                log("브라우저 연결이 종료되었습니다.")
+                return False
             time.sleep(float(config['SETTINGS']['refresh_interval']))
 
-def test_login_and_search(driver, wait, config, progress_signal=None, is_running=None):
+def start_reservation(driver, wait, config, progress_signal=None):
     def log(message):
         if progress_signal:
             progress_signal.emit(message)
         print(message)  # 콘솔 출력도 유지
         
     try:
-        # 중지 요청 확인
-        if is_running is not None and not is_running:
-            log("예매 시도가 중단되었습니다.")
-            return False
-            
         # 1. 로그인 페이지로 이동
         log("로그인 페이지로 이동 중...")
         driver.get("https://etk.srail.kr/cmc/01/selectLoginForm.do?pageId=TK0701000000")
@@ -334,7 +363,7 @@ def test_login_and_search(driver, wait, config, progress_signal=None, is_running
             time.sleep(0.3)
             
             # 10. 조회 및 예약 시도
-            return search_and_reserve(driver, wait, config, progress_signal, is_running)
+            return search_and_reserve(driver, wait, config, progress_signal)
             
         except TimeoutException:
             log("로그인 실패: 아이디나 비밀번호를 확인해주세요.")
@@ -355,12 +384,8 @@ def main():
         driver, wait = setup_driver()
         
         try:
-            # 로그인 및 역 입력 테스트
-            test_login_and_search(driver, wait, config)
-            
-            # 결과 확인을 위해 잠시 대기
+            start_reservation(driver, wait, config)
             input("프로그램을 종료하려면 Enter를 누르세요...")
-            
         finally:
             driver.quit()
             

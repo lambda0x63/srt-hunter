@@ -14,19 +14,22 @@ class SRTReservationWorker(QThread):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.is_running = True
-        
-    def stop(self):
-        self.is_running = False
+        self.driver = None
         
     def run(self):
         try:
-            driver, wait = setup_driver()
-            success = test_login_and_search(driver, wait, self.config, self.progress_signal, self.is_running)
+            self.driver, wait = setup_driver()
+            success = start_reservation(self.driver, wait, self.config, self.progress_signal)
             self.finished_signal.emit(success)
         except Exception as e:
             self.progress_signal.emit(f"오류 발생: {str(e)}")
             self.finished_signal.emit(False)
+        finally:
+            if self.driver:
+                try:
+                    self.driver.quit()
+                except:
+                    pass
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -208,12 +211,8 @@ class MainWindow(QMainWindow):
         # 실행 버튼 (오른쪽 컬럼)
         button_layout = QHBoxLayout()
         self.start_button = QPushButton("예매 시작")
-        self.stop_button = QPushButton("중지")
-        self.stop_button.setEnabled(False)
         self.start_button.clicked.connect(self.start_reservation)
-        self.stop_button.clicked.connect(self.stop_reservation)
         button_layout.addWidget(self.start_button)
-        button_layout.addWidget(self.stop_button)
         right_column.addLayout(button_layout)
         
         # 로그 표시 영역 (왼쪽 컬럼)
@@ -304,13 +303,6 @@ class MainWindow(QMainWindow):
         
         # UI 상태 변경
         self.start_button.setEnabled(False)
-        self.stop_button.setEnabled(True)
-        
-    def stop_reservation(self):
-        if hasattr(self, 'worker'):
-            self.worker.stop()
-            self.update_log("예매 시도를 중단합니다...")
-            self.stop_button.setEnabled(False)
 
     def validate_inputs(self):
         if not self.id_input.text() or not self.pw_input.text():
@@ -382,7 +374,6 @@ class MainWindow(QMainWindow):
 
     def reservation_finished(self, success):
         self.start_button.setEnabled(True)
-        self.stop_button.setEnabled(False)
         self.progress_bar.hide()
         
         if success:
