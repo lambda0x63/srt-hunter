@@ -245,6 +245,11 @@ class MainWindow(QMainWindow):
         self.log_text.setReadOnly(True)
         left_column.addWidget(self.log_text)
         
+        dev_info = QLabel("SRT Hunter v1.1.0 | Developed by faith6 | GitHub: https://github.com/root39293/srt-hunter")
+        dev_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dev_info.setStyleSheet("color: gray;")
+        left_column.addWidget(dev_info)
+        
         # 초기 시간 옵션 설정
         self.update_time_options()
 
