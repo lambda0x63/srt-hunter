@@ -1,2 +1,4 @@
-config.ini
+build/
+dist/
+*.spec
 __pycache__

@@ -11,15 +11,26 @@ class SRTReservationWorker(QThread):
     progress_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool)
     
-    def __init__(self, config):
+    def __init__(self, login_info, train_info, personal_info, settings):
         super().__init__()
-        self.config = config
+        self.login_info = login_info
+        self.train_info = train_info
+        self.personal_info = personal_info
+        self.settings = settings
         self.driver = None
         
     def run(self):
         try:
             self.driver, wait = setup_driver()
-            success = start_reservation(self.driver, wait, self.config, self.progress_signal)
+            success = start_reservation(
+                self.driver, 
+                wait, 
+                self.login_info,
+                self.train_info,
+                self.personal_info,
+                self.settings,
+                self.progress_signal
+            )
             self.finished_signal.emit(success)
         except Exception as e:
             self.progress_signal.emit(f"오류 발생: {str(e)}")
@@ -253,14 +264,10 @@ class MainWindow(QMainWindow):
         self.time_select.clear()
         
         if selected_date == current_date:
-            # 현재 시간의 바로 이전 짝수 시간을 찾음
+            # 현재 시간대부터 표시
             current_hour = current_time.hour
-            prev_even_hour = (current_hour // 2) * 2
             
-            # 시작 시간은 이전 짝수 시간
-            start_hour = max(0, prev_even_hour)
-            
-            for hour in range(start_hour, 23, 2):
+            for hour in range(0, 23, 2):
                 self.time_select.addItem(f"{hour:02d}:00")
         else:
             # 다른 날짜는 모든 시간대 표시
@@ -284,30 +291,31 @@ class MainWindow(QMainWindow):
         # 시간 값을 2자리 숫자로 변환 (예: "8:00" -> "08")
         time_str = self.time_select.currentText().split(':')[0].zfill(2)
         
-        config = {
-            'LOGIN': {
-                'id': self.id_input.text(),
-                'password': self.pw_input.text()
-            },
-            'PERSONAL': {
-                'phone': self.phone_input.text(),
-                'birth': self.birth_input.text()
-            },
-            'TRAIN': {
-                'departure': self.dep_stn.currentText(),
-                'arrival': self.arr_stn.currentText(),
-                'date': date_str,
-                'target_time': time_str,
-                'time_tolerance': self.time_tolerance_input.text() or "30",
-                'seat_types': {
-                    'special': self.special_seat.isChecked(),
-                    'general': self.general_seat.isChecked(),
-                    'standing': self.standing_seat.isChecked()
-                }
-            },
-            'SETTINGS': {
-                'refresh_interval': self.refresh_interval_input.text() or "0.05"
+        login_info = {
+            'id': self.id_input.text(),
+            'password': self.pw_input.text()
+        }
+        
+        personal_info = {
+            'phone': self.phone_input.text(),
+            'birth': self.birth_input.text()
+        }
+        
+        train_info = {
+            'departure': self.dep_stn.currentText(),
+            'arrival': self.arr_stn.currentText(),
+            'date': date_str,
+            'target_time': time_str,
+            'time_tolerance': self.time_tolerance_input.text() or "30",
+            'seat_types': {
+                'special': self.special_seat.isChecked(),
+                'general': self.general_seat.isChecked(),
+                'standing': self.standing_seat.isChecked()
             }
+        }
+        
+        settings = {
+            'refresh_interval': self.refresh_interval_input.text() or "0.05"
         }
         
         # 진행 상태 표시 초기화
@@ -315,7 +323,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.show()
         
         # 워커 스레드 시작
-        self.worker = SRTReservationWorker(config)
+        self.worker = SRTReservationWorker(login_info, train_info, personal_info, settings)
         self.worker.progress_signal.connect(self.update_log)
         self.worker.finished_signal.connect(self.reservation_finished)
         self.worker.start()
@@ -375,7 +383,7 @@ class MainWindow(QMainWindow):
             return False
 
         # 날짜와 시간 검증
-        from datetime import datetime
+        from datetime import datetime, timedelta
         current_time = datetime.now()
         
         # 선택된 날짜 파싱 (예: "2024/12/28(토)" -> datetime)
@@ -386,15 +394,19 @@ class MainWindow(QMainWindow):
             f"{selected_date_str} {selected_time_str}",
             "%Y/%m/%d %H:%M"
         )
-        
-        # 현재 시간과 비교
-        if selected_datetime <= current_time:
-            QMessageBox.warning(
-                self,
-                "입력 오류",
-                "선택한 시간이 현재 시간보다 이전입니다.\n현재 시간 이후의 시간을 선택해주세요."
-            )
-            return False
+
+        # 선택된 날짜가 오늘이고, 선택된 시간대가 현재 시간대보다 2시간 이상 이전인 경우에만 거부
+        if selected_datetime.date() == current_time.date():
+            current_hour_block = (current_time.hour // 2) * 2
+            selected_hour = selected_datetime.hour
+            
+            if selected_hour < current_hour_block - 2:
+                QMessageBox.warning(
+                    self,
+                    "입력 오류",
+                    "선택한 시간대가 너무 이전입니다.\n현재 시간 근처의 시간대를 선택해주세요."
+                )
+                return False
             
         return True
 

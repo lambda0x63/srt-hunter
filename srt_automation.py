@@ -7,7 +7,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import Select
 import time
-import configparser
 import os
 
 def setup_driver():
@@ -17,14 +16,6 @@ def setup_driver():
     driver = webdriver.Chrome(service=service, options=options)
     wait = WebDriverWait(driver, 10)
     return driver, wait
-
-def load_config():
-    config = configparser.ConfigParser()
-    config_path = os.path.join(os.path.dirname(__file__), 'config.ini')
-    if not os.path.exists(config_path):
-        raise FileNotFoundError("config.ini 파일을 찾을 수 없습니다.")
-    config.read(config_path, encoding='utf-8')
-    return config
 
 def parse_train_info(row):
     """
@@ -130,7 +121,7 @@ def find_available_train(driver, wait, target_time, time_tolerance, seat_types):
         print(f"열차 검색 중 오류: {str(e)}")
         return None
 
-def search_and_reserve(driver, wait, config, progress_signal=None):
+def search_and_reserve(driver, wait, login_info, train_info, settings, personal_info, progress_signal=None):
     def log(message):
         if progress_signal:
             progress_signal.emit(message)
@@ -150,9 +141,9 @@ def search_and_reserve(driver, wait, config, progress_signal=None):
             time.sleep(1)  # 검색 결과 로딩 대기
             
             # 허용 시간 내의 예약 가능한 열차 찾기
-            target_time = config['TRAIN']['target_time']
-            time_tolerance = int(config['TRAIN']['time_tolerance'])
-            seat_types = config['TRAIN']['seat_types']
+            target_time = train_info['target_time']
+            time_tolerance = int(train_info['time_tolerance'])
+            seat_types = train_info['seat_types']
             available_train = find_available_train(driver, wait, target_time, time_tolerance, seat_types)
             
             if available_train:
@@ -228,14 +219,14 @@ def search_and_reserve(driver, wait, config, progress_signal=None):
                 phone_input = quick_wait.until(EC.presence_of_element_located(
                     (By.XPATH, "/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[1]/div/div/span/input")))
                 phone_input.clear()
-                phone_input.send_keys(config['PERSONAL']['phone'])
+                phone_input.send_keys(personal_info['phone'])
                 log("휴대폰 번호 입력 완료")
 
                 # 생년월일 입력
                 birth_input = quick_wait.until(EC.presence_of_element_located(
                     (By.XPATH, "/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[2]/div/div/span/input")))
                 birth_input.clear()
-                birth_input.send_keys(config['PERSONAL']['birth'])
+                birth_input.send_keys(personal_info['birth'])
                 log("생년월일 입력 완료")
 
                 # 최종 결제요청 버튼 클릭
@@ -279,20 +270,20 @@ def search_and_reserve(driver, wait, config, progress_signal=None):
                 return True
             
             log("예약 가능한 열차가 없습니다. 잠시 후 다시 시도합니다...")
-            time.sleep(float(config['SETTINGS']['refresh_interval']))
+            time.sleep(float(settings['refresh_interval']))
                 
         except Exception as e:
             log(f"검색 중 오류 발생: {str(e)}")
             if "Connection aborted" in str(e) or "Failed to establish" in str(e):
                 log("브라우저 연결이 종료되었습니다.")
                 return False
-            time.sleep(float(config['SETTINGS']['refresh_interval']))
+            time.sleep(float(settings['refresh_interval']))
 
-def start_reservation(driver, wait, config, progress_signal=None):
+def start_reservation(driver, wait, login_info, train_info, personal_info, settings, progress_signal=None):
     def log(message):
         if progress_signal:
             progress_signal.emit(message)
-        print(message)  # 콘솔 출력도 유지
+        print(message)
         
     try:
         # 1. 로그인 페이지로 이동
@@ -301,8 +292,8 @@ def start_reservation(driver, wait, config, progress_signal=None):
         time.sleep(0.5)
         
         # 2. 로그인 정보 입력
-        member_id = config['LOGIN']['id']
-        member_pw = config['LOGIN']['password']
+        member_id = login_info['id']
+        member_pw = login_info['password']
         
         log("로그인 시도 중...")
         id_input = wait.until(EC.presence_of_element_located((By.ID, "srchDvNm01")))
@@ -338,7 +329,7 @@ def start_reservation(driver, wait, config, progress_signal=None):
             time.sleep(0.5)
             
             # 6. 출발역 입력
-            dep_stn = config['TRAIN']['departure']
+            dep_stn = train_info['departure']
             log(f"출발역 입력 시도: {dep_stn}")
             dep_input = wait.until(EC.presence_of_element_located(
                 (By.XPATH, "/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[1]/div/div/div[1]/input")))
@@ -349,7 +340,7 @@ def start_reservation(driver, wait, config, progress_signal=None):
             time.sleep(0.3)
             
             # 7. 도착역 입력
-            arr_stn = config['TRAIN']['arrival']
+            arr_stn = train_info['arrival']
             log(f"도착역 입력 시도: {arr_stn}")
             arr_input = wait.until(EC.presence_of_element_located(
                 (By.XPATH, "/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[1]/div/div/div[2]/input")))
@@ -360,7 +351,7 @@ def start_reservation(driver, wait, config, progress_signal=None):
             time.sleep(0.3)
             
             # 8. 날짜 선택
-            date = config['TRAIN']['date']
+            date = train_info['date']
             log(f"날짜 선택 시도: {date}")
             
             # 날짜 드롭다운 클릭
@@ -377,7 +368,7 @@ def start_reservation(driver, wait, config, progress_signal=None):
             time.sleep(0.3)
             
             # 9. 시간 선택
-            target_time = config['TRAIN']['target_time']
+            target_time = train_info['target_time']
             log(f"시간 선택 시도: {target_time}시")
             
             # 시간 드롭다운 클릭
@@ -394,7 +385,7 @@ def start_reservation(driver, wait, config, progress_signal=None):
             time.sleep(0.3)
             
             # 10. 조회 및 예약 시도
-            return search_and_reserve(driver, wait, config, progress_signal)
+            return search_and_reserve(driver, wait, login_info, train_info, settings, personal_info, progress_signal)
             
         except TimeoutException:
             log("로그인 실패: 아이디나 비밀번호를 확인해주세요.")
@@ -408,18 +399,8 @@ def start_reservation(driver, wait, config, progress_signal=None):
 
 def main():
     try:
-        # 설정 로드
-        config = load_config()
-        
-        # 드라이버 설정
-        driver, wait = setup_driver()
-        
-        try:
-            start_reservation(driver, wait, config)
-            input("프로그램을 종료하려면 Enter를 누르세요...")
-        finally:
-            driver.quit()
-            
+        print("이 스크립트는 직접 실행하지 않고 GUI를 통해 실행해주세요.")
+        print("python main.py를 실행하여 GUI를 시작하세요.")
     except Exception as e:
         print(f"프로그램 실행 중 오류 발생: {str(e)}")
 
