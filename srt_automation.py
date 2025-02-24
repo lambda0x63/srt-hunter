@@ -181,7 +181,7 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
 
                 # 카카오페이 버튼 클릭
                 kakao_pay_button = quick_wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[6]/div[1]/table/tbody/tr/td/div/input[3]")))
+                    (By.XPATH, "/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[6]/div[1]/table/tbody/tr/td/div/input[4]")))
                 kakao_pay_button.click()
                 log("카카오페이 선택 완료")
 
@@ -238,21 +238,40 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                 # 결제 완료될 때까지 대기 (최대 600초 = 10분)
                 payment_wait = WebDriverWait(driver, 600)
                 try:
-                    # 휴대폰 결제 확인 화면이 나타날 때까지 대기
-                    payment_wait.until(EC.presence_of_element_located(
-                        (By.XPATH, "//div[contains(text(), '휴대폰에서 카카오페이 결제후,')]")))
-                    log("휴대폰에서 카카오페이 결제를 진행해주세요. (제한시간: 10분)")
-                    
                     # 결제가 완료될 때까지 계속 대기
                     while True:
                         try:
-                            # 현재 URL이 SRT 도메인으로 변경되었는지 확인
+                            # 결제완료 페이지의 특정 요소들을 확인
                             current_url = driver.current_url
-                            if "srail.kr" in current_url:
-                                log("결제가 완료되었습니다!")
-                                break
+                            page_source = driver.page_source
+                            
+                            # 결제완료 페이지의 특징적인 텍스트들을 확인
+                            completion_indicators = [
+                                "스마트티켓 발급이 완료되었습니다",
+                                "결제완료",
+                                "승인번호",
+                                "결제금액"
+                            ]
+                            
+                            if any(indicator in page_source for indicator in completion_indicators):
+                                # 결제 정보 추출 시도
+                                try:
+                                    amount = driver.find_element(By.XPATH, "//td[contains(text(), '원')]").text
+                                    approval_date = driver.find_element(By.XPATH, "//td[contains(text(), '20')]").text
+                                    log(f"결제가 완료되었습니다!")
+                                    log(f"결제 금액: {amount}")
+                                    log(f"승인 일시: {approval_date}")
+                                except:
+                                    log("결제가 완료되었습니다!")
+                                
+                                time.sleep(2)  # 결제 완료 페이지 로딩 대기
+                                return True
+                                
                             time.sleep(1)
-                        except:
+                        except Exception as e:
+                            if "no such window" in str(e):
+                                log("결제가 완료되었습니다!")
+                                return True
                             time.sleep(1)
                 except TimeoutException:
                     log("결제 시간이 초과되었습니다. (10분 경과)")
@@ -260,11 +279,16 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                     while True:
                         try:
                             current_url = driver.current_url
-                            if "srail.kr" in current_url:
+                            page_source = driver.page_source
+                            if "결제완료" in page_source or "srail.kr" in current_url:
                                 log("결제가 완료되었습니다!")
-                                break
+                                time.sleep(2)  # 결제 완료 페이지 로딩 대기
+                                return True
                             time.sleep(1)
-                        except:
+                        except Exception as e:
+                            if "no such window" in str(e):
+                                log("결제가 완료되었습니다!")
+                                return True
                             time.sleep(1)
 
                 return True

@@ -1,9 +1,15 @@
 [tool.poetry]
 name = "srt-hunter"
-version = "0.1.0"
-description = "SRT auto booking"
+version = "1.1.1"
+description = "SRT auto booking with improved payment completion detection"
 authors = ["faith6"]
 readme = "README.md"
+package-mode = false
+
+# packages 설정 제거
+# packages = [
+#     { include = "srt_hunter" }
+# ]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
@@ -16,5 +22,5 @@ pyinstaller = "^6.11.1"
 
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"

@@ -1,7 +1,7 @@
 # SRT-Hunter
 
-SRT 1-person ticketing automation program (v1.1.0)
-> CLI version(v0.1.0) to GUI version(v1.1.0)
+SRT 1-person ticketing automation program (v1.1.1)
+> CLI version(v0.1.0) to GUI version(v1.1.1)
 
 ## Notice
 - 개인 사용 목적 한정
@@ -25,6 +25,10 @@ SRT 1-person ticketing automation program (v1.1.0)
 - 자동 시간대 필터링 (현재 시간 기준)
 - 입력값 유효성 검사 강화
 - 다크 모드 UI
+- 결제 완료 상세 정보 표시 (v1.1.1 업데이트)
+  - 결제 금액 표시
+  - 승인 일시 표시
+  - 결제 완료 페이지 정확한 감지
 
 ## Installation
 ```bash
@@ -77,3 +81,9 @@ poetry run python main.py
 
 ## License
 MIT License
+
+## Changelog
+### v1.1.1
+- 결제 완료 감지 로직 개선
+- 결제 상세 정보(금액, 승인일시) 표시 기능 추가
+- 결제 완료 페이지 안정성 개선
