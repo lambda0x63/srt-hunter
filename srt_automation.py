@@ -265,6 +265,16 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                                     log("결제가 완료되었습니다!")
                                 
                                 time.sleep(2)  # 결제 완료 페이지 로딩 대기
+                                
+                                # 모든 창 닫기
+                                try:
+                                    for window in driver.window_handles:
+                                        driver.switch_to.window(window)
+                                        driver.close()
+                                except:
+                                    pass
+                                
+                                log("예매가 완료되어 브라우저를 종료합니다.")
                                 return True
                                 
                             time.sleep(1)
