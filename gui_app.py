@@ -1,12 +1,13 @@
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QLabel, QLineEdit, QComboBox, QPushButton, QGroupBox, 
-                           QGridLayout, QTextEdit, QProgressBar, QMessageBox, QHBoxLayout, QCheckBox)
+                           QGridLayout, QTextEdit, QProgressBar, QMessageBox, QHBoxLayout, QCheckBox, QRadioButton, QButtonGroup)
 from PyQt6.QtCore import QThread, pyqtSignal, Qt, QDate
 from PyQt6.QtGui import QFont
 import qdarkstyle
 import sys
 from srt_automation import *
 from version import VERSION, AUTHOR, GITHUB_URL
+import os
 
 class SRTReservationWorker(QThread):
     progress_signal = pyqtSignal(str)
@@ -47,7 +48,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SRT Ticket Hunter")
-        self.setGeometry(100, 100, 1300, 700)
+        self.setGeometry(100, 100, 1300, 850)
         
         # 다크 스타일 적용
         app = QApplication.instance()
@@ -211,14 +212,20 @@ class MainWindow(QMainWindow):
         
         # 좌석 유형 선택 옵션 추가
         seat_type_label = QLabel("좌석 유형:")
-        self.special_seat = QCheckBox("특실")
-        self.general_seat = QCheckBox("일반실")
-        self.standing_seat = QCheckBox("입석+좌석")
-        
+
+        # 특실/일반실 선택을 위한 라디오 버튼 그룹
+        self.seat_type_group = QButtonGroup(self)
+        self.special_seat = QRadioButton("특실")
+        self.general_seat = QRadioButton("일반실")
+        self.seat_type_group.addButton(self.special_seat)
+        self.seat_type_group.addButton(self.general_seat)
+
+        # 일반실을 기본값으로 설정
+        self.general_seat.setChecked(True)
+
         seat_type_layout = QHBoxLayout()
         seat_type_layout.addWidget(self.special_seat)
         seat_type_layout.addWidget(self.general_seat)
-        seat_type_layout.addWidget(self.standing_seat)
         
         settings_layout.addWidget(seat_type_label, 0, 0)
         settings_layout.addLayout(seat_type_layout, 0, 1)
@@ -233,14 +240,51 @@ class MainWindow(QMainWindow):
         settings_layout.addWidget(QLabel("새로고침 간격(초):"), 2, 0)
         settings_layout.addWidget(self.refresh_interval_input, 2, 1)
         
-        # 도움말 텍스트 추가
+        # 인원수 선택 추가
+        passenger_layout = QHBoxLayout()
+        passenger_label = QLabel("인원수:")
+        self.passenger_count = QComboBox()
+        self.passenger_count.addItems([str(i) for i in range(1, 5)])  # 1-4명으로 제한
+        passenger_layout.addWidget(passenger_label)
+        passenger_layout.addWidget(self.passenger_count)
+        settings_layout.addLayout(passenger_layout, 3, 0, 1, 2)
+        
+        # 동승자 정보 입력 필드 추가
+        passenger_info_layout = QVBoxLayout()
+        self.passenger_info_group = QGroupBox("동승자 정보")
+        self.passenger_info_group.setVisible(False)  # 기본적으로 숨김 상태
+        passenger_info_inner_layout = QGridLayout()
+
+        self.passenger_names = []
+        for i in range(3):  # 최대 3명의 동승자 (총 4명)
+            name_label = QLabel(f"동승자 {i+1} 이름:")
+            name_input = QLineEdit()
+            name_input.setPlaceholderText("이름을 입력하세요")
+            self.passenger_names.append(name_input)
+            passenger_info_inner_layout.addWidget(name_label, i, 0)
+            passenger_info_inner_layout.addWidget(name_input, i, 1)
+            name_input.setVisible(False)  # 초기에는 모두 숨김
+
+        self.passenger_info_group.setLayout(passenger_info_inner_layout)
+        passenger_info_layout.addWidget(self.passenger_info_group)
+        settings_layout.addLayout(passenger_info_layout, 7, 0, 1, 2)
+
+        # 인원수 변경 시 동승자 정보 필드 표시/숨김 처리
+        self.passenger_count.currentIndexChanged.connect(self.update_passenger_info_fields)
+        
+        # 도움말 텍스트 추가 - 위치 조정
         help_text = QLabel("* 허용 시간 범위: 선택한 시간부터 해당 시간만큼 이후까지 예매를 시도 (예: 14시 선택, 30분 설정시 14:00~14:30)")
         help_text.setWordWrap(True)  # 긴 텍스트 자동 줄바꿈
-        settings_layout.addWidget(help_text, 3, 0, 1, 2)
+        settings_layout.addWidget(help_text, 4, 0, 1, 2)
         
         refresh_help = QLabel("* 새로고침 간격: 0.05 ~ 0.1초 권장")
         refresh_help.setWordWrap(True)
-        settings_layout.addWidget(refresh_help, 4, 0, 1, 2)
+        settings_layout.addWidget(refresh_help, 5, 0, 1, 2)
+        
+        # 다인 예매 도움말 추가
+        multi_help = QLabel("* 다인 예매: SRT 시스템이 자동으로 최적 좌석 배정 (2-4인)")
+        multi_help.setWordWrap(True)
+        settings_layout.addWidget(multi_help, 6, 0, 1, 2)
         
         settings_group.setLayout(settings_layout)
         right_column.addWidget(settings_group)
@@ -255,6 +299,13 @@ class MainWindow(QMainWindow):
         self.start_button = QPushButton("예매 시작")
         self.start_button.clicked.connect(self.start_reservation)
         button_layout.addWidget(self.start_button)
+        
+        # 중단 및 초기화 버튼 추가
+        self.reset_button = QPushButton("중단 및 초기화")
+        self.reset_button.setStyleSheet("background-color: #d9534f; color: white;")  # 빨간색 스타일
+        self.reset_button.clicked.connect(self.reset_program)
+        button_layout.addWidget(self.reset_button)
+        
         right_column.addLayout(button_layout)
         
         # 로그 표시 영역 (왼쪽 컬럼)
@@ -301,6 +352,21 @@ class MainWindow(QMainWindow):
         else:
             self.start_button.setEnabled(True)
 
+    def update_passenger_info_fields(self):
+        """인원수에 따라 동승자 정보 입력 필드를 표시/숨김"""
+        count = int(self.passenger_count.currentText())
+        
+        # 2명 이상일 때만 동승자 정보 그룹 표시
+        self.passenger_info_group.setVisible(count > 1)
+        
+        # 필요한 수의 동승자 필드만 표시
+        for i, name_input in enumerate(self.passenger_names):
+            name_input.setVisible(i < count - 1)
+            if i < count - 1:
+                name_input.setPlaceholderText(f"동승자 {i+1} 이름")
+            else:
+                name_input.clear()  # 숨겨진 필드는 내용 삭제
+
     def start_reservation(self):
         if not self.validate_inputs():
             return
@@ -313,13 +379,23 @@ class MainWindow(QMainWindow):
         
         login_info = {
             'id': self.id_input.text(),
-            'password': self.pw_input.text()
+            'password': self.pw_input.text(),
+            'phone': self.phone_input.text(),
+            'birth': self.birth_input.text()
         }
         
         personal_info = {
             'phone': self.phone_input.text(),
             'birth': self.birth_input.text()
         }
+        
+        # 동승자 정보 추가
+        passenger_names = []
+        count = int(self.passenger_count.currentText())
+        if count > 1:
+            for i in range(count - 1):
+                if i < len(self.passenger_names):
+                    passenger_names.append(self.passenger_names[i].text())
         
         train_info = {
             'departure': self.dep_stn.currentText(),
@@ -329,9 +405,10 @@ class MainWindow(QMainWindow):
             'time_tolerance': self.time_tolerance_input.text() or "30",
             'seat_types': {
                 'special': self.special_seat.isChecked(),
-                'general': self.general_seat.isChecked(),
-                'standing': self.standing_seat.isChecked()
-            }
+                'general': self.general_seat.isChecked()
+            },
+            'passenger_count': count,
+            'passenger_names': passenger_names
         }
         
         settings = {
@@ -352,24 +429,16 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(False)
 
     def validate_inputs(self):
-        if not self.id_input.text() or not self.pw_input.text():
-            QMessageBox.warning(self, "입력 오류", "아이디와 비밀번호를 입력해주세요.")
-            return False
-        if not self.phone_input.text() or not self.birth_input.text():
-            QMessageBox.warning(self, "입력 오류", "전화번호와 생년월일을 입력해주세요.")
+        if not self.id_input.text() or not self.phone_input.text() or not self.birth_input.text():
+            QMessageBox.warning(self, "입력 오류", "아이디와 전화번호, 생년월일을 입력해주세요.")
             return False
         if self.dep_stn.currentText() == self.arr_stn.currentText():
             QMessageBox.warning(self, "입력 오류", "출발역과 도착역이 동일합니다.")
             return False
         
         # 좌석 유형 검증
-        if not (self.special_seat.isChecked() or self.general_seat.isChecked() or self.standing_seat.isChecked()):
-            QMessageBox.warning(self, "입력 오류", "최소한 하나의 좌석 유형을 선택해주세요.")
-            return False
-            
-        # 일반실이 선택되지 않았는데 입석+좌석이 선택된 경우
-        if not self.general_seat.isChecked() and self.standing_seat.isChecked():
-            QMessageBox.warning(self, "입력 오류", "입석+좌석은 일반실이 선택된 경우에만 선택할 수 있습니다.")
+        if not (self.special_seat.isChecked() or self.general_seat.isChecked()):
+            QMessageBox.warning(self, "입력 오류", "좌석 유형(특실/일반실)을 선택해주세요.")
             return False
             
         # 전화번호 형식 검사
@@ -402,6 +471,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "입력 오류", "새로고침 간격은 양수여야 합니다.")
             return False
 
+        # 인원수가 2명 이상일 때 동승자 이름 검증
+        passenger_count = int(self.passenger_count.currentText())
+        if passenger_count > 1:
+            for i in range(passenger_count - 1):
+                if not self.passenger_names[i].text().strip():
+                    QMessageBox.warning(self, "입력 오류", f"동승자 {i+1}의 이름을 입력해주세요.")
+                    return False
+        
         # 날짜와 시간 검증
         from datetime import datetime, timedelta
         current_time = datetime.now()
@@ -444,61 +521,88 @@ class MainWindow(QMainWindow):
             self.update_log("예매에 실패했습니다.")
 
     def save_login_info(self):
-        """로그인 정보를 암호화하여 저장"""
-        import json
-        import base64
-        from cryptography.fernet import Fernet
-        
-        # 간단한 암호화 키 생성
-        key = Fernet.generate_key()
-        cipher_suite = Fernet(key)
-        
-        data = {
-            'id': self.id_input.text(),
-            'password': self.pw_input.text(),
-            'phone': self.phone_input.text(),
-            'birth': self.birth_input.text()
-        }
-        
-        # 데이터 암호화
-        encrypted_data = cipher_suite.encrypt(json.dumps(data).encode())
-        
-        # 키와 암호화된 데이터 저장
-        with open('user_data.key', 'wb') as key_file:
-            key_file.write(key)
-        
-        with open('user_data.enc', 'wb') as data_file:
-            data_file.write(encrypted_data)
-        
-        self.update_log("로그인 정보가 안전하게 저장되었습니다.")
+        try:
+            # 비밀번호를 제외한 정보만 저장
+            info = {
+                'id': self.id_input.text(),
+                'phone': self.phone_input.text(),
+                'birth': self.birth_input.text()
+            }
+            
+            # 스크립트 실행 디렉토리를 기준으로 절대 경로 사용
+            file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'login_info.txt')
+            
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(f"{info['id']}\n")
+                f.write(f"{info['phone']}\n")
+                f.write(f"{info['birth']}\n")
+            
+            QMessageBox.information(self, "저장 완료", "로그인 정보가 저장되었습니다. (비밀번호 제외)")
+            self.update_log(f"로그인 정보가 저장되었습니다: {file_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "저장 오류", f"정보 저장 중 오류 발생: {str(e)}")
+            self.update_log(f"정보 저장 중 오류 발생: {str(e)}")
 
     def load_login_info(self):
-        """저장된 로그인 정보 불러오기"""
-        import json
-        import os
-        from cryptography.fernet import Fernet
-        
-        if not (os.path.exists('user_data.key') and os.path.exists('user_data.enc')):
-            return
-        
         try:
-            # 키와 암호화된 데이터 로드
-            with open('user_data.key', 'rb') as key_file:
-                key = key_file.read()
+            # 스크립트 실행 디렉토리를 기준으로 절대 경로 사용
+            file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'login_info.txt')
             
-            with open('user_data.enc', 'rb') as data_file:
-                encrypted_data = data_file.read()
-            
-            # 복호화
-            cipher_suite = Fernet(key)
-            decrypted_data = json.loads(cipher_suite.decrypt(encrypted_data).decode())
-            
-            # UI에 데이터 설정
-            self.id_input.setText(decrypted_data.get('id', ''))
-            self.pw_input.setText(decrypted_data.get('password', ''))
-            self.phone_input.setText(decrypted_data.get('phone', ''))
-            self.birth_input.setText(decrypted_data.get('birth', ''))
-            
-            self.update_log("저장된 로그인 정보를 불러왔습니다.")
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    if len(lines) >= 3:  # 최소 3줄 (ID, 전화번호, 생년월일)
+                        self.id_input.setText(lines[0].strip())
+                        self.phone_input.setText(lines[1].strip())
+                        self.birth_input.setText(lines[2].strip())
+                        self.update_log("저장된 로그인 정보를 불러왔습니다. (비밀번호는 직접 입력해주세요)")
+                        return
+                self.update_log("저장된 로그인 정보가 불충분합니다.")
+            else:
+                self.update_log("저장된 로그인 정보 파일이 없습니다.")
         except Exception as e:
-            self.update_log(f"저장된 정보를 불러오는 중 오류 발생: {str(e)}") 
+            QMessageBox.warning(self, "불러오기 오류", f"저장된 정보를 불러오는 중 오류 발생: {str(e)}")
+            self.update_log(f"저장된 정보를 불러오는 중 오류 발생: {str(e)}")
+
+    def reset_program(self):
+        # 사용자에게 확인 메시지
+        reply = QMessageBox.question(self, '초기화', 
+                                     '진행 중인 모든 작업을 중단하고 초기화하시겠습니까?',
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+                                     QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.No:
+            return
+            
+        # 진행 중인 작업이 있는지 확인
+        if hasattr(self, 'worker') and self.worker.isRunning():
+            try:
+                # 드라이버 종료 시도
+                if hasattr(self.worker, 'driver') and self.worker.driver:
+                    try:
+                        self.worker.driver.quit()
+                    except:
+                        pass
+                
+                # 쓰레드 종료
+                self.worker.terminate()
+                self.worker.wait(1000)  # 최대 1초 대기
+                
+                # 강제 종료가 필요한 경우
+                if self.worker.isRunning():
+                    self.worker.quit()
+                    
+                self.update_log("작업이 강제 중단되었습니다.")
+            except Exception as e:
+                self.update_log(f"작업 중단 중 오류 발생: {str(e)}")
+                
+        # UI 초기화
+        self.progress_bar.hide()
+        self.start_button.setEnabled(True)
+        
+        # 로그 초기화
+        self.log_text.clear()
+        self.update_log("프로그램이 초기화되었습니다.")
+        
+        # 시간 옵션 초기화
+        self.update_time_options() 

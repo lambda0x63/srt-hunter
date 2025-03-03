@@ -20,7 +20,7 @@ def setup_driver():
 
 def parse_train_info(row):
     """
-    열차 정보를 파싱하는 함수
+    테이블 행에서 열차 정보를 추출하는 함수
     """
     try:
         cols = row.find_elements(By.TAG_NAME, "td")
@@ -37,13 +37,10 @@ def parse_train_info(row):
         
         # 일반실 예약 버튼 찾기
         general_button = None
-        standing_button = None
         general_spans = cols[6].find_elements(By.CSS_SELECTOR, "a[href='#none'] span")
         for span in general_spans:
             if span.text == "예약하기":
                 general_button = span.find_element(By.XPATH, "./..")
-            elif span.text == "입석+좌석":
-                standing_button = span.find_element(By.XPATH, "./..")
         
         return {
             'type': train_type,
@@ -51,8 +48,7 @@ def parse_train_info(row):
             'dep_time': dep_time,
             'arr_time': arr_time,
             'special_button': special_button,
-            'general_button': general_button,
-            'standing_button': standing_button
+            'general_button': general_button
         }
     except Exception as e:
         print(f"열차 정보 파싱 중 오류: {str(e)}")
@@ -66,7 +62,7 @@ def time_diff_minutes(time1, time2):
     h2, m2 = map(int, time2.split(':'))
     return abs((h1 * 60 + m1) - (h2 * 60 + m2))
 
-def find_available_train(driver, wait, target_time, time_tolerance, seat_types):
+def find_available_train(driver, wait, target_time, time_tolerance, seat_types, passenger_count=1):
     """
     허용 시간 내의 예약 가능한 열차를 찾는 함수
     """
@@ -95,19 +91,27 @@ def find_available_train(driver, wait, target_time, time_tolerance, seat_types):
             # 선택된 좌석 유형에 따라 예약 가능 여부 확인
             available_buttons = []
             
-            if seat_types['special'] and train_info['special_button']:
+            if seat_types.get('special', False) and train_info['special_button']:
                 available_buttons.append(('특실', train_info['special_button']))
                 
-            if seat_types['general'] and train_info['general_button']:
+            if seat_types.get('general', False) and train_info['general_button']:
                 available_buttons.append(('일반실', train_info['general_button']))
-                
-            if seat_types['standing'] and train_info['standing_button']:
-                available_buttons.append(('입석+좌석', train_info['standing_button']))
-                
+            
             if available_buttons:
                 train_info['time_diff'] = time_difference
                 train_info['available_buttons'] = available_buttons
                 available_trains.append(train_info)
+        
+        # 인원수와 좌석 선호도 정보 추가 처리
+        # 다인 예매일 경우 특별한 처리 적용
+        if passenger_count > 1:
+            # 좌석 유형별 처리 로직 구현
+            pass  # 임시 패스 처리 (실제 구현에서는 알고리즘 추가)
+        
+        # 다인 예매 정보 표시
+        if passenger_count > 1:
+            for train in available_trains:
+                train['seat_note'] = f"{passenger_count}명 자동 배정 예정"
         
         # 시간 차이가 가장 적은 열차 선택
         if available_trains:
@@ -128,8 +132,19 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
             progress_signal.emit(message)
         print(message)
         
+    # 인원수 추출
+    passenger_count = train_info.get('passenger_count', 1)
+    
+    log(f"인원수: {passenger_count}명")
+    
     while True:
         try:
+            # 인원수 설정 (다인 예매인 경우)
+            if passenger_count > 1:
+                if not set_passenger_count(driver, wait, passenger_count, log):
+                    log("인원수 설정 실패, 다시 시도합니다.")
+                    continue
+            
             # 조회하기 버튼 클릭
             log("\n새로운 검색 시도...")
             search_button = wait.until(EC.presence_of_element_located(
@@ -145,7 +160,7 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
             target_time = train_info['target_time']
             time_tolerance = int(train_info['time_tolerance'])
             seat_types = train_info['seat_types']
-            available_train = find_available_train(driver, wait, target_time, time_tolerance, seat_types)
+            available_train = find_available_train(driver, wait, target_time, time_tolerance, seat_types, passenger_count)
             
             if available_train:
                 log(f"\n예약 가능한 열차를 찾았습니다!")
@@ -153,19 +168,14 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                 log(f"출발시간: {available_train['dep_time']}")
                 log(f"도착시간: {available_train['arr_time']}")
                 
+                if passenger_count > 1:
+                    log(f"인원수: {passenger_count}명 (자동 배정)")
+                    if 'seat_note' in available_train:
+                        log(available_train['seat_note'])
+                
                 # 예약하기 버튼 클릭
                 available_train['reserve_button'].click()
                 log("예약하기 버튼 클릭 완료")
-                
-                # 입석+좌석 선택 시 발생하는 alert 처리
-                try:
-                    alert = driver.switch_to.alert
-                    alert_text = alert.text
-                    if "입석+좌석 승차권은 '스마트폰 발권'이 불가합니다" in alert_text:
-                        alert.accept()
-                        log("입석+좌석 안내 확인")
-                except:
-                    pass  # alert가 없는 경우 무시
                 
                 # 결제하기 버튼 클릭
                 quick_wait = WebDriverWait(driver, 5)
@@ -174,17 +184,95 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                 payment_button.click()
                 log("결제하기 버튼 클릭 완료")
 
-                # 간편결제 탭 클릭
-                easy_payment_tab = quick_wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[2]/ul/li[2]/a")))
-                easy_payment_tab.click()
-                log("간편결제 탭 클릭 완료")
-
-                # 카카오페이 버튼 클릭
-                kakao_pay_button = quick_wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[6]/div[1]/table/tbody/tr/td/div/input[4]")))
-                kakao_pay_button.click()
-                log("카카오페이 선택 완료")
+                # 다인 예매인 경우 동승자 정보 입력
+                if passenger_count > 1:
+                    try:
+                        log("동승자 정보 입력 중...")
+                        
+                        # 동승자 정보 입력 대기
+                        quick_wait = WebDriverWait(driver, 5)
+                        
+                        # 동승자 수만큼 반복
+                        for i in range(1, passenger_count):  # 1부터 시작 (첫 번째 승객은 예매자 본인)
+                            try:
+                                # 동승자 이름 입력 필드 찾기 (인덱스가 1부터 시작)
+                                passenger_input = quick_wait.until(EC.presence_of_element_located(
+                                    (By.XPATH, f"/html/body/div[1]/div[4]/div/div[2]/form/fieldset/div[11]/div[5]/div[3]/table/tbody/tr[{i+1}]/td[8]/input[2]")))
+                                
+                                # 동승자 이름 입력
+                                passenger_name = ""
+                                if 'passenger_names' in train_info and i-1 < len(train_info['passenger_names']):
+                                    passenger_name = train_info['passenger_names'][i-1]
+                                
+                                # 이름이 비어있으면 기본값 설정
+                                if not passenger_name:
+                                    passenger_name = f"동승자{i}"
+                                
+                                # 이름 입력
+                                passenger_input.clear()
+                                passenger_input.send_keys(passenger_name)
+                                log(f"동승자 {i} 이름 입력 완료: {passenger_name}")
+                            except Exception as e:
+                                log(f"동승자 {i} 이름 입력 중 오류: {str(e)}")
+                        
+                        log("동승자 정보 입력 완료")
+                        time.sleep(1)  # 페이지 안정화를 위한 대기 시간 추가
+                    except Exception as e:
+                        log(f"동승자 정보 입력 중 오류 발생: {str(e)}")
+                
+                # 간편결제 탭과 카카오페이 선택 부분 수정
+                try:
+                    log("간편결제 탭으로 전환 중...")
+                    # 페이지 안정화를 위한 대기 시간 추가
+                    time.sleep(1)
+                    
+                    # id로 요소 찾기 (더 정확함)
+                    easy_payment_tab = quick_wait.until(EC.presence_of_element_located((By.ID, "chTab2")))
+                    
+                    # JavaScript로 클릭 실행
+                    driver.execute_script("arguments[0].click();", easy_payment_tab)
+                    # 또는 onclick 이벤트 직접 호출
+                    log("간편결제 탭 클릭 완료")
+                    
+                    # 탭 전환 후 잠시 대기
+                    time.sleep(1)
+                    
+                    # 카카오페이 라디오 버튼 선택 - id로 찾기
+                    kakao_pay_button = quick_wait.until(EC.presence_of_element_located((By.ID, "kakaoPay")))
+                    driver.execute_script("arguments[0].click();", kakao_pay_button)
+                    # 또는 onclick 이벤트 직접 호출
+                    # driver.execute_script("changeStlTpCd(document.getElementById('kakaoPay'))")
+                    log("카카오페이 선택 완료")
+                    
+                except Exception as e:
+                    log(f"결제 방식 선택 중 오류: {str(e)}")
+                    # 대체 방법 시도
+                    try:
+                        # 스크롤을 아래로 이동
+                        driver.execute_script("window.scrollBy(0, 300);")
+                        time.sleep(1)
+                        
+                        # onclick 이벤트 직접 호출 시도
+                        driver.execute_script("changeTab(1); return false;")
+                        log("간편결제 탭 클릭 완료 (스크립트 호출)")
+                        
+                        time.sleep(1)
+                        
+                        # onclick 이벤트 직접 호출
+                        driver.execute_script("changeStlTpCd(document.getElementById('kakaoPay'))")
+                        log("카카오페이 선택 완료 (스크립트 호출)")
+                    except Exception as sub_e:
+                        log(f"대체 방법으로 결제 방식 선택 중 오류: {str(sub_e)}")
+                        # 세 번째 방법 시도
+                        try:
+                            log("다른 방법으로 결제 방식 선택 시도...")
+                            # XPath로 시도
+                            driver.find_element(By.XPATH, "//a[@id='chTab2']").click()
+                            time.sleep(1)
+                            driver.find_element(By.XPATH, "//input[@id='kakaoPay']").click()
+                            log("결제 방식 선택 완료 (XPath)")
+                        except Exception as third_e:
+                            log(f"모든 결제 방식 선택 시도 실패: {str(third_e)}")
 
                 # 스마트폰 발권 옵션 클릭
                 smartphone_ticket = quick_wait.until(EC.element_to_be_clickable(
@@ -293,7 +381,7 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                             page_source = driver.page_source
                             if "결제완료" in page_source or "srail.kr" in current_url:
                                 log("결제가 완료되었습니다!")
-                                time.sleep(2)  # 결제 완료 페이지 로딩 대기
+                                time.sleep(2)
                                 return True
                             time.sleep(1)
                         except Exception as e:
@@ -442,3 +530,32 @@ def main():
 
 if __name__ == "__main__":
     main() 
+
+# 인원수 설정 함수 구현
+def set_passenger_count(driver, wait, count, log_func):
+    try:
+        # 1인이면 기본값이므로 별도 설정 필요 없음
+        if count <= 1:
+            log_func("인원수: 1명 (기본값)")
+            return True
+            
+        log_func(f"인원수 {count}명으로 설정 중...")
+        
+        # 인원수 선택 드롭다운 찾기 - ID로 찾기 시도
+        try:
+            adult_select = wait.until(EC.presence_of_element_located((By.ID, "psgInfoPerPrnb1")))
+        except:
+            # ID로 찾기 실패 시 XPath로 시도
+            adult_select = wait.until(EC.presence_of_element_located(
+                (By.XPATH, "/html/body/div/div[4]/div/div[2]/form/fieldset/div[1]/div/ul/li[2]/div[2]/div[1]/select")))
+        
+        # Select 객체를 사용하여 값 설정
+        select = Select(adult_select)
+        select.select_by_value(str(count))
+        
+        log_func(f"인원수 {count}명 설정 완료")
+        return True
+        
+    except Exception as e:
+        log_func(f"인원수 설정 중 오류 발생: {str(e)}")
+        return False 

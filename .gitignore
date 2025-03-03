@@ -2,5 +2,5 @@ build/
 dist/
 *.spec
 __pycache__
-user_data.key
-user_data.enc
+.venv
+login_info.txt
