@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import Select
 import time
 import os
+from version import VERSION
 
 def setup_driver():
     service = Service(ChromeDriverManager().install())
@@ -433,6 +434,7 @@ def start_reservation(driver, wait, login_info, train_info, personal_info, setti
 
 def main():
     try:
+        print(f"SRT 티켓 헌터 v{VERSION}")
         print("이 스크립트는 직접 실행하지 않고 GUI를 통해 실행해주세요.")
         print("python main.py를 실행하여 GUI를 시작하세요.")
     except Exception as e:

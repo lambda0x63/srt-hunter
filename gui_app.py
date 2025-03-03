@@ -6,6 +6,7 @@ from PyQt6.QtGui import QFont
 import qdarkstyle
 import sys
 from srt_automation import *
+from version import VERSION, AUTHOR, GITHUB_URL
 
 class SRTReservationWorker(QThread):
     progress_signal = pyqtSignal(str)
@@ -85,6 +86,12 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(left_widget, 0, 0)
         main_layout.addWidget(right_widget, 0, 1)
         
+        # 초기 시간 옵션 설정
+        self.update_time_options()
+        
+        # 저장된 로그인 정보 불러오기
+        self.load_login_info()
+
     def setup_style(self):
         # 폰트 설정
         app = QApplication.instance()
@@ -110,6 +117,16 @@ class MainWindow(QMainWindow):
         login_layout.addWidget(self.id_input, 0, 1)
         login_layout.addWidget(QLabel("비밀번호"), 1, 0)
         login_layout.addWidget(self.pw_input, 1, 1)
+        
+        # 저장/불러오기 버튼 추가
+        save_load_layout = QHBoxLayout()
+        self.save_button = QPushButton("정보 저장")
+        self.load_button = QPushButton("정보 불러오기")
+        self.save_button.clicked.connect(self.save_login_info)
+        self.load_button.clicked.connect(self.load_login_info)
+        save_load_layout.addWidget(self.save_button)
+        save_load_layout.addWidget(self.load_button)
+        login_layout.addLayout(save_load_layout, 2, 0, 1, 2)
         
         login_group.setLayout(login_layout)
         left_column.addWidget(login_group)
@@ -245,13 +262,11 @@ class MainWindow(QMainWindow):
         self.log_text.setReadOnly(True)
         left_column.addWidget(self.log_text)
         
-        dev_info = QLabel("SRT Hunter v1.1.0 | Developed by faith6 | GitHub: https://github.com/root39293/srt-hunter")
+        # 버전 정보 표시 - version.py에서 정보 가져오기
+        dev_info = QLabel(f"SRT Hunter v{VERSION} | Developed by {AUTHOR} | GitHub: {GITHUB_URL}")
         dev_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
         dev_info.setStyleSheet("color: gray;")
         left_column.addWidget(dev_info)
-        
-        # 초기 시간 옵션 설정
-        self.update_time_options()
 
     def update_time_options(self):
         """시간 선택 콤보박스의 옵션을 업데이트하는 함수"""
@@ -426,4 +441,64 @@ class MainWindow(QMainWindow):
             self.update_log("예매가 완료되었습니다!")
         else:
             QMessageBox.warning(self, "예매 실패", "예매에 실패했습니다. 로그를 확인해주세요.")
-            self.update_log("예매에 실패했습니다.") 
+            self.update_log("예매에 실패했습니다.")
+
+    def save_login_info(self):
+        """로그인 정보를 암호화하여 저장"""
+        import json
+        import base64
+        from cryptography.fernet import Fernet
+        
+        # 간단한 암호화 키 생성
+        key = Fernet.generate_key()
+        cipher_suite = Fernet(key)
+        
+        data = {
+            'id': self.id_input.text(),
+            'password': self.pw_input.text(),
+            'phone': self.phone_input.text(),
+            'birth': self.birth_input.text()
+        }
+        
+        # 데이터 암호화
+        encrypted_data = cipher_suite.encrypt(json.dumps(data).encode())
+        
+        # 키와 암호화된 데이터 저장
+        with open('user_data.key', 'wb') as key_file:
+            key_file.write(key)
+        
+        with open('user_data.enc', 'wb') as data_file:
+            data_file.write(encrypted_data)
+        
+        self.update_log("로그인 정보가 안전하게 저장되었습니다.")
+
+    def load_login_info(self):
+        """저장된 로그인 정보 불러오기"""
+        import json
+        import os
+        from cryptography.fernet import Fernet
+        
+        if not (os.path.exists('user_data.key') and os.path.exists('user_data.enc')):
+            return
+        
+        try:
+            # 키와 암호화된 데이터 로드
+            with open('user_data.key', 'rb') as key_file:
+                key = key_file.read()
+            
+            with open('user_data.enc', 'rb') as data_file:
+                encrypted_data = data_file.read()
+            
+            # 복호화
+            cipher_suite = Fernet(key)
+            decrypted_data = json.loads(cipher_suite.decrypt(encrypted_data).decode())
+            
+            # UI에 데이터 설정
+            self.id_input.setText(decrypted_data.get('id', ''))
+            self.pw_input.setText(decrypted_data.get('password', ''))
+            self.phone_input.setText(decrypted_data.get('phone', ''))
+            self.birth_input.setText(decrypted_data.get('birth', ''))
+            
+            self.update_log("저장된 로그인 정보를 불러왔습니다.")
+        except Exception as e:
+            self.update_log(f"저장된 정보를 불러오는 중 오류 발생: {str(e)}") 
