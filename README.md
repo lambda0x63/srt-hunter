@@ -10,6 +10,9 @@ SRT 자동화 예매 에이전트 (v1.3.4)
 - 중단 및 초기화 기능
 - 결제 완료 상세 정보 표시
 
+## UI
+![ui](https://github.com/user-attachments/assets/30db9ec0-493e-4cc2-852b-4ec1fe2ff06a)
+
 ## Download
 - Download: [Latest Release](https://github.com/root39293/srt-hunter/releases/latest)
 - Run on your own PC
