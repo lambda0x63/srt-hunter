@@ -8,6 +8,7 @@ import sys
 import platform
 import subprocess
 import re
+import glob
 
 def get_version():
     """version.py 파일에서 버전 정보 추출"""
@@ -16,7 +17,7 @@ def get_version():
     
     match = re.search(r'VERSION = "([^"]+)"', content)
     if match:
-        return match.group(1)
+        return match.group(1).strip()
     return "unknown"
 
 def main():
@@ -36,12 +37,12 @@ def main():
     if system == 'Windows':
         script_path = os.path.join(script_dir, 'build_windows.bat')
         cmd = [script_path]
-        output_file = f"dist/SRT-Hunter-v{version}-Windows.zip"
+        output_pattern = f"dist/SRT-Hunter-v*-Windows.zip"
     elif system == 'Darwin':  # macOS
         script_path = os.path.join(script_dir, 'build_macos.sh')
         os.chmod(script_path, 0o755)  # 실행 권한 부여
         cmd = ['/bin/bash', script_path]
-        output_file = f"dist/SRT-Hunter-v{version}-macOS.zip"
+        output_pattern = f"dist/SRT-Hunter-v*-macOS.zip"
     else:
         print(f"지원되지 않는 운영체제: {system}")
         print("현재는 Windows와 macOS만 지원합니다.")
@@ -49,14 +50,19 @@ def main():
     
     # 빌드 스크립트 실행
     try:
-        subprocess.run(cmd, check=True)
-        if os.path.exists(output_file):
-            print(f"빌드 성공! 결과 파일: {output_file}")
+        result = subprocess.run(cmd, check=False)
+        
+        # 결과 파일 확인 (패턴 매칭 사용)
+        output_files = glob.glob(output_pattern)
+        if output_files:
+            print(f"빌드 성공! 결과 파일: {output_files[0]}")
+            return 0
         else:
-            print(f"빌드는 완료되었으나 결과 파일을 찾을 수 없습니다: {output_file}")
-    except subprocess.CalledProcessError as e:
+            print(f"빌드는 완료되었으나 결과 파일을 찾을 수 없습니다: {output_pattern}")
+            return 1
+    except Exception as e:
         print(f"빌드 중 오류 발생: {e}")
-        sys.exit(1)
+        return 1
     
 if __name__ == "__main__":
-    main() 
+    sys.exit(main()) 

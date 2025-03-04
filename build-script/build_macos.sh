@@ -1,25 +1,24 @@
 #!/bin/bash
-echo "SRT-Hunter macOS 빌드 시작..."
+echo "SRT-Hunter macOS Build Starting..."
 
-# 스크립트 실행 권한 설정
+# Set script execution permissions
 chmod +x build-script/build_macos.sh
 
-# 버전 정보 확인
+# Check version info
 VERSION=$(grep -o 'VERSION = "[^"]*"' version.py | cut -d'"' -f2)
-echo "현재 버전: $VERSION"
+echo "Current Version: $VERSION"
 
-# 환경 준비
-echo "Poetry 환경 초기화 중..."
-poetry install --no-dev
+# Prepare environment
+echo "Initializing Poetry environment..."
+poetry install
 
-# resources 디렉토리 생성 (아이콘 및 리소스 파일용)
+# Create resources directory
 mkdir -p resources
 
-# PyInstaller로 앱 번들 생성
-echo "PyInstaller 실행 중..."
+# Generate app bundle with PyInstaller
+echo "Running PyInstaller..."
 poetry run pyinstaller --noconfirm --clean \
     --name="SRT-Hunter" \
-    --icon=resources/icon.icns \
     --add-data="LICENSE:." \
     --add-data="README.md:." \
     --add-data="resources:resources" \
@@ -27,10 +26,22 @@ poetry run pyinstaller --noconfirm --clean \
     --onefile \
     main.py
 
-# 출력 파일명 변경 및 압축
+# Check if build was successful
+if [ ! -f "dist/SRT-Hunter" ]; then
+    echo "Build failed! Executable not found."
+    exit 1
+fi
+
+# Create ZIP file
 cd dist
-echo "생성된 파일 압축 중..."
+echo "Creating ZIP file..."
 zip -r "SRT-Hunter-v${VERSION}-macOS.zip" "SRT-Hunter"
 cd ..
 
-echo "macOS 빌드 완료! (dist/SRT-Hunter-v${VERSION}-macOS.zip)" 
+# Verify ZIP file was created
+if [ -f "dist/SRT-Hunter-v${VERSION}-macOS.zip" ]; then
+    echo "macOS build completed successfully! (dist/SRT-Hunter-v${VERSION}-macOS.zip)"
+else
+    echo "ZIP file creation failed!"
+    exit 1
+fi 

@@ -1,6 +1,6 @@
 # SRT-Hunter
 
-SRT 자동화 예매 에이전트 (v1.3.3)
+SRT 자동화 예매 에이전트 (v1.3.4)
 
 ## Features
 - GUI 기반 인터페이스
@@ -26,6 +26,9 @@ poetry run python main.py
 - Chrome 브라우저 필요
 
 ## Change Log
+
+### v1.3.4
+- 빌드스크립트 버그 수정
 
 ### v1.3.3
 - 다중 승객 예약 기능 추가 (1-4명)
