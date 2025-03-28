@@ -44,7 +44,7 @@ jobs:
       - name: 디버그 정보 출력
         run: |
           echo "Version from output: ${{ steps.get_version.outputs.version }}"
-          ls -la build-script/
+          dir build-script/
 
       - name: Windows 빌드
         if: matrix.os == 'windows-latest'
