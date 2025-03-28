@@ -53,7 +53,7 @@ jobs:
           python build-script/build.py
 
       - name: 빌드 결과물 업로드
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: SRT-Hunter-${{ steps.get_version.outputs.version }}-${{ matrix.platform }}
           path: dist/SRT-Hunter-v*-${{ matrix.platform }}.zip
@@ -65,7 +65,7 @@ jobs:
 
     steps:
       - name: 빌드 결과물 다운로드
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
 
       - name: 릴리스 생성
         uses: softprops/action-gh-release@v1
