@@ -33,30 +33,36 @@ jobs:
 
       - name: 버전 정보 추출
         id: get_version
-        shell: python
+        shell: bash
         run: |
-          with open('version.py', 'r') as f:
-              for line in f:
-                  if line.startswith('VERSION ='):
-                      version = line.split('=')[1].strip().strip('"')
-                      print(f"::set-output name=version::{version}")
-                      break
+          VERSION=$(grep -o 'VERSION = "[^"]*"' version.py | cut -d'"' -f2)
+          echo "Version extracted: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 디버그 정보 출력
+        run: |
+          echo "Version from output: ${{ steps.get_version.outputs.version }}"
+          ls -la build-script/
 
       - name: Windows 빌드
         if: matrix.os == 'windows-latest'
+        shell: cmd
         run: |
-          python build-script/build.py
+          build-script\build_windows.bat
 
       - name: macOS 빌드
         if: matrix.os == 'macos-latest'
+        shell: bash
         run: |
-          python build-script/build.py
+          chmod +x build-script/build_macos.sh
+          ./build-script/build_macos.sh
 
       - name: 빌드 결과물 업로드
         uses: actions/upload-artifact@v4
         with:
           name: SRT-Hunter-${{ steps.get_version.outputs.version }}-${{ matrix.platform }}
-          path: dist/SRT-Hunter-v*-${{ matrix.platform }}.zip
+          path: |
+            dist/SRT-Hunter-v*-${{ matrix.platform }}.zip
 
   release:
     needs: build
