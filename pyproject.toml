@@ -2,7 +2,7 @@
 name = "srt-hunter"
 version = "1.3.5"
 description = "SRT auto booking with improved payment completion detection"
-authors = ["faith6"]
+authors = ["lambda0x99"]
 readme = "README.md"
 package-mode = false
 
