@@ -1,5 +1,5 @@
 # SRT-Hunter
-SRT Automated Booking Agent (v1.3.4)
+SRT Automated Booking Agent (v1.3.5)
 ## Features
 - GUI-based interface
 - SRT automatic login and booking automation
@@ -23,6 +23,11 @@ poetry run python main.py
 - Recommended refresh interval of 0.05 seconds or higher
 - Chrome browser required
 ## Change Log
+### v1.3.5
+- Fixed alert handling for double SRT trains
+- Improved payment button click stability
+- Added wait time before payment button click
+- Enhanced error handling for train reservation process
 ### v1.3.4
 - Fixed build script bugs
 ### v1.3.3

@@ -177,12 +177,31 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                 available_train['reserve_button'].click()
                 log("예약하기 버튼 클릭 완료")
                 
+                # SRT 2개 편성 연결 열차 알림창 처리 추가
+                try:
+                    alert = WebDriverWait(driver, 3).until(EC.alert_is_present())
+                    alert_text = alert.text
+                    if "SRT 2개 편성을 연결하여 운행하는 열차" in alert_text:
+                        log("2개 편성 연결 열차 알림 확인")
+                        alert.accept()
+                except:
+                    log("알림창 없음")
+                
+                # 결제하기 버튼 클릭 전 짧은 대기 추가
+                time.sleep(1)
+                
                 # 결제하기 버튼 클릭
-                quick_wait = WebDriverWait(driver, 5)
-                payment_button = quick_wait.until(EC.element_to_be_clickable(
-                    (By.XPATH, "/html/body/div/div[4]/div/div[2]/form/fieldset/div[11]/a[1]")))
-                payment_button.click()
-                log("결제하기 버튼 클릭 완료")
+                try:
+                    quick_wait = WebDriverWait(driver, 5)
+                    payment_button = quick_wait.until(EC.element_to_be_clickable(
+                        (By.XPATH, "/html/body/div/div[4]/div/div[2]/form/fieldset/div[11]/a[1]")))
+                    driver.execute_script("arguments[0].click();", payment_button)
+                    log("결제하기 버튼 클릭 완료")
+                except Exception as e:
+                    log(f"결제하기 버튼 클릭 실패: {str(e)}")
+                    # 페이지 새로고침 후 다시 시도
+                    driver.refresh()
+                    continue
 
                 # 다인 예매인 경우 동승자 정보 입력
                 if passenger_count > 1:
