@@ -2,9 +2,14 @@ name: Build SRT-Hunter
 
 on:
   push:
-    tags:
-      - 'v*'  
-  workflow_dispatch: 
+    branches: 
+      - main
+  pull_request:
+    branches:
+      - main
+  tags:
+    - 'v*'  
+  workflow_dispatch:
 
 jobs:
   build:
