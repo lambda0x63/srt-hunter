@@ -1,8 +1,8 @@
 #!/bin/bash
 echo "SRT-Hunter macOS Build Starting..."
 
-# Set script execution permissions
-chmod +x build-script/build_macos.sh
+echo "현재 작업 디렉토리: $(pwd)"
+ls -la
 
 # Check version info
 VERSION=$(grep -o 'VERSION = "[^"]*"' version.py | cut -d'"' -f2)

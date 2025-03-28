@@ -30,8 +30,17 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Poetry 설치
-        run: pip install poetry
+      - name: Poetry 설치 (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
+
+      - name: Poetry 설치 (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
 
       - name: 버전 정보 추출
         id: get_version
@@ -41,23 +50,37 @@ jobs:
           echo "Version extracted: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: 디버그 정보 출력
+      - name: 디버그 정보 출력 (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
         run: |
           echo "Version from output: ${{ steps.get_version.outputs.version }}"
-          dir build-script/
+          ls -la build-script/
+
+      - name: 디버그 정보 출력 (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          echo "Version from output: ${{ steps.get_version.outputs.version }}"
+          Get-ChildItem -Path build-script
 
       - name: Windows 빌드
         if: matrix.os == 'windows-latest'
         shell: cmd
         run: |
+          echo 빌드 스크립트 실행 전 환경 확인:
+          cd
+          dir build-script
           build-script\build_windows.bat
 
       - name: macOS 빌드
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
+          pwd
+          ls -la build-script
           chmod +x build-script/build_macos.sh
-          ./build-script/build_macos.sh
+          bash build-script/build_macos.sh
 
       - name: 빌드 결과물 업로드
         uses: actions/upload-artifact@v4
