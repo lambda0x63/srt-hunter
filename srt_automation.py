@@ -190,6 +190,16 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                 # 결제하기 버튼 클릭 전 짧은 대기 추가
                 time.sleep(1)
                 
+                # 잔여석 없음 메시지 확인
+                try:
+                    no_seats_message = driver.find_element(By.XPATH, "//p[contains(text(), '잔여석 없음') or contains(text(), '좌석이 매진')]")
+                    if no_seats_message:
+                        log("다른 사용자가 먼저 좌석을 예약했습니다. 다시 검색을 시도합니다.")
+                        driver.back()  # 새로고침 대신 이전 페이지로 돌아가기
+                        continue
+                except:
+                    log("좌석이 있는 것으로 확인됩니다. 결제 진행 중...")
+                
                 # 결제하기 버튼 클릭
                 try:
                     quick_wait = WebDriverWait(driver, 5)
@@ -199,8 +209,18 @@ def search_and_reserve(driver, wait, login_info, train_info, settings, personal_
                     log("결제하기 버튼 클릭 완료")
                 except Exception as e:
                     log(f"결제하기 버튼 클릭 실패: {str(e)}")
-                    # 페이지 새로고침 후 다시 시도
-                    driver.refresh()
+                    # 잔여석이 없을 가능성이 있으므로 확인
+                    try:
+                        page_source = driver.page_source
+                        if "잔여석 없음" in page_source or "좌석이 매진" in page_source:
+                            log("다른 사용자가 먼저 좌석을 예약했습니다. 다시 검색을 시도합니다.")
+                        else:
+                            log("알 수 없는 이유로 결제하기 버튼을 찾을 수 없습니다.")
+                    except:
+                        log("페이지 확인 중 오류가 발생했습니다.")
+                    
+                    # 이전 페이지로 돌아가기
+                    driver.back()
                     continue
 
                 # 다인 예매인 경우 동승자 정보 입력
