@@ -50,7 +50,18 @@ class SRTReservationWorker(QThread):
                 return
                 
             from srt_automation import setup_driver, start_reservation
-            self.playwright, self.browser, self.context, self.page = setup_driver()
+            
+            try:
+                self.playwright, self.browser, self.context, self.page = setup_driver()
+            except Exception as e:
+                if "Executable doesn't exist" in str(e) or "Playwright" in str(e):
+                    self.progress_signal.emit("⚠️ 브라우저가 설치되지 않았습니다.")
+                    self.progress_signal.emit("터미널에서 다음 명령을 실행해주세요:")
+                    self.progress_signal.emit("playwright install chromium")
+                    self.finished_signal.emit(False)
+                    return
+                else:
+                    raise
             
             if self._stop_requested:
                 return

@@ -3,11 +3,40 @@ import time
 from version import VERSION
 
 def setup_driver():
-    playwright = sync_playwright().start()
-    browser = playwright.chromium.launch(
-        headless=False,
-        args=['--start-maximized']
-    )
+    import sys
+    import os
+    import subprocess
+    
+    # PyInstaller로 빌드된 경우 브라우저 확인 및 설치
+    if getattr(sys, 'frozen', False):
+        try:
+            # 먼저 브라우저가 있는지 시도
+            playwright = sync_playwright().start()
+            browser = playwright.chromium.launch(
+                headless=False,
+                args=['--start-maximized']
+            )
+        except Exception as e:
+            if "Executable doesn't exist" in str(e):
+                print("브라우저를 다운로드합니다. 잠시만 기다려주세요...")
+                # playwright install chromium 실행
+                subprocess.run(["playwright", "install", "chromium"], capture_output=False, check=False)
+                # 다시 시도
+                playwright = sync_playwright().start()
+                browser = playwright.chromium.launch(
+                    headless=False,
+                    args=['--start-maximized']
+                )
+            else:
+                raise
+    else:
+        # 개발 환경
+        playwright = sync_playwright().start()
+        browser = playwright.chromium.launch(
+            headless=False,
+            args=['--start-maximized']
+        )
+    
     context = browser.new_context(
         viewport={'width': 1920, 'height': 1080},
         ignore_https_errors=True
