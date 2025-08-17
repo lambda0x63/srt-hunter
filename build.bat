@@ -12,7 +12,6 @@ pyinstaller ^
     --name="SRT-Hunter" ^
     --onefile ^
     --windowed ^
-    --icon="static/icon/icon.png" ^
     --add-data="static;static" ^
     --hidden-import="PyQt6" ^
     --hidden-import="playwright" ^
