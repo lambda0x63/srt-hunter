@@ -17,7 +17,6 @@ pyinstaller \
     --name="SRT-Hunter" \
     --onefile \
     --windowed \
-    --icon="static/icon/icon.png" \
     --add-data="static:static" \
     --hidden-import="PyQt6" \
     --hidden-import="playwright" \
@@ -29,7 +28,18 @@ pyinstaller \
 # Check if build was successful
 if [ -f "dist/SRT-Hunter.app" ] || [ -f "dist/SRT-Hunter" ]; then
     echo "✅ Build successful!"
-    echo "📍 Output: dist/SRT-Hunter.app"
+    
+    # Remove quarantine attribute for macOS
+    if [ -f "dist/SRT-Hunter" ]; then
+        xattr -cr dist/SRT-Hunter
+        echo "🔓 Removed quarantine attributes"
+    fi
+    if [ -d "dist/SRT-Hunter.app" ]; then
+        xattr -cr dist/SRT-Hunter.app
+        echo "🔓 Removed quarantine attributes from app bundle"
+    fi
+    
+    echo "📍 Output: dist/SRT-Hunter"
 else
     echo "❌ Build failed!"
     exit 1
