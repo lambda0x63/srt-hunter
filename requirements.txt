@@ -1,0 +1,13 @@
+# Web automation
+playwright>=1.49.0
+
+# GUI
+PyQt6>=6.8.0
+qdarkstyle>=3.2.3
+
+# Build
+pyinstaller>=6.11.1
+
+# Security
+cryptography>=44.0.2
+
