@@ -6,12 +6,12 @@
 
 <h2 align="left">Features</h2>
 
-- GUI-based interface
-- SRT automatic login and booking automation
-- KakaoPay automatic payment integration
-- Multi-passenger reservation support (1-4 people)
-- Pause and reset functionality
-- Display of payment completion details
+- 🚀 Playwright 기반 빠른 자동화
+- 🎨 현대적인 GUI 인터페이스
+- 🔐 SRT 자동 로그인 및 예약
+- 💳 카카오페이 자동 결제 연동
+- ⏸️ 일시정지 및 재시작 기능
+- 📊 실시간 진행 상태 표시
 
 <h2 align="left">UI</h2>
 
@@ -36,6 +36,13 @@ poetry run python main.py
 - Chrome browser required
 
 <h2 align="left">Change Log</h2>
+
+### v2.0.0
+- Playwright 엔진으로 완전 재작성
+- 더 빠르고 안정적인 자동화
+- 현대적인 UI/UX 개선
+- 1인 예매에 최적화
+- 레거시 Selenium 코드 제거
 
 ### v1.3.6
 - Added logic to check for no seats left message and improved handling of failed checkout button clicks

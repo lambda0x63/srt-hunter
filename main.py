@@ -5,8 +5,9 @@ from version import VERSION
 
 def main():
     app = QApplication(sys.argv)
+    app.setApplicationName("SRT Hunter")
+    app.setOrganizationName("Lambda")
     window = MainWindow()
-    window.setWindowTitle(f"SRT Ticket Hunter v{VERSION}")
     window.show()
     sys.exit(app.exec())
 

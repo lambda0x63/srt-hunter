@@ -1,0 +1,129 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            artifact_name: SRT-Hunter-macOS
+            build_script: ./build.sh
+          - os: windows-latest
+            artifact_name: SRT-Hunter-Windows
+            build_script: build.bat
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        playwright install chromium
+
+    - name: Build executable (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        chmod +x build.sh
+        ./build.sh
+
+    - name: Build executable (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        build.bat
+
+    - name: Create ZIP archive (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd dist
+        zip -r ../${{ matrix.artifact_name }}.zip SRT-Hunter.app
+        cd ..
+
+    - name: Create ZIP archive (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive -Path dist\SRT-Hunter.exe -DestinationPath ${{ matrix.artifact_name }}.zip
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: ${{ matrix.artifact_name }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: SRT Hunter ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## SRT Hunter ${{ steps.get_version.outputs.VERSION }}
+          
+          ### 새로운 기능
+          - Playwright 엔진 지원 (V2)
+          - 더 안정적인 자동화
+          - 개선된 성능
+          
+          ### 다운로드
+          - macOS: SRT-Hunter-macOS.zip
+          - Windows: SRT-Hunter-Windows.zip
+          
+          ### 설치 방법
+          1. 위 파일 중 운영체제에 맞는 파일 다운로드
+          2. 압축 해제
+          3. 실행 파일 실행
+          
+          **Chrome 브라우저가 설치되어 있어야 합니다**
+        draft: false
+        prerelease: false
+
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/SRT-Hunter-macOS/SRT-Hunter-macOS.zip
+        asset_name: SRT-Hunter-macOS.zip
+        asset_content_type: application/zip
+
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./artifacts/SRT-Hunter-Windows/SRT-Hunter-Windows.zip
+        asset_name: SRT-Hunter-Windows.zip
+        asset_content_type: application/zip

@@ -1,3 +1,3 @@
-VERSION = "1.3.6"
-AUTHOR = "lambda0x99"
-GITHUB_URL = "https://github.com/root39293/srt-hunter" 
+VERSION = "2.0.0"
+AUTHOR = "lambda0x63"
+GITHUB_URL = "https://github.com/lambda0x63/srt-hunter" 
