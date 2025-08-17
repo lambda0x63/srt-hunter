@@ -34,7 +34,6 @@ logs/
 
 # User data
 login_info.txt
-*.txt
 
 # Test
 .pytest_cache/
