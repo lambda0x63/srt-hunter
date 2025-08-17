@@ -223,19 +223,17 @@ def search_and_reserve(page, login_info, train_info, settings, personal_info, pr
                 
                 # SRT 2개 편성 연결 열차 알림창 처리
                 page.on("dialog", lambda dialog: dialog.accept())
-                time.sleep(1)
+                
+                # confirmReservationInfo 페이지로 이동될 때까지 대기 (대기열 자동 처리)
+                page.wait_for_url("**/confirmReservationInfo**", timeout=30000)
+                log("예약 확인 페이지 로드 완료")
                 
                 # 잔여석 없음 메시지 확인
-                no_seats_selectors = [
-                    "p:has-text('잔여석 없음')",
-                    "p:has-text('좌석이 매진')"
-                ]
-                
-                for selector in no_seats_selectors:
-                    if page.locator(selector).count() > 0:
-                        log("다른 사용자가 먼저 좌석을 예약했습니다. 다시 검색을 시도합니다.")
-                        page.go_back()
-                        continue
+                time.sleep(1)
+                if "잔여석 없음" in page.content() or "좌석이 매진" in page.content():
+                    log("다른 사용자가 먼저 좌석을 예약했습니다. 다시 검색을 시도합니다.")
+                    page.go_back()
+                    continue
                 
                 log("좌석이 있는 것으로 확인됩니다. 결제 진행 중...")
                 
@@ -243,7 +241,7 @@ def search_and_reserve(page, login_info, train_info, settings, personal_info, pr
                 try:
                     payment_button = page.locator("xpath=/html/body/div/div[4]/div/div[2]/form/fieldset/div[11]/a[1]")
                     payment_button.wait_for(state="visible", timeout=5000)
-                    page.evaluate("(element) => element.click()", payment_button.element_handle())
+                    payment_button.click()
                     log("결제하기 버튼 클릭 완료")
                 except Exception as e:
                     log(f"결제하기 버튼 클릭 실패: {str(e)}")
@@ -303,38 +301,73 @@ def search_and_reserve(page, login_info, train_info, settings, personal_info, pr
                 final_payment_button.click()
                 log("결제 및 발권 버튼 클릭 완료")
 
-                # 새 창/탭 처리
-                time.sleep(2)
+                # 새 창/탭 처리 - 레거시처럼 처리
+                time.sleep(2)  # 새 창이 열릴 때까지 대기
                 
-                # Playwright에서는 popup 이벤트를 사용
-                with page.context.expect_page() as new_page_info:
-                    pass  # 새 페이지가 열릴 때까지 대기
+                # 이미 열려있는 모든 페이지 확인
+                all_pages = page.context.pages
+                log(f"현재 열린 페이지 수: {len(all_pages)}")
                 
-                new_page = new_page_info.value
-                log("카카오페이 결제창으로 전환 완료")
+                if len(all_pages) > 1:
+                    # 마지막으로 열린 페이지로 전환 (레거시처럼)
+                    new_page = all_pages[-1]
+                    log("카카오페이 결제창으로 전환 완료 (이미 열림)")
+                else:
+                    # 새 페이지가 아직 안 열렸다면 대기
+                    try:
+                        with page.context.expect_page(timeout=5000) as new_page_info:
+                            pass
+                        new_page = new_page_info.value
+                        log("카카오페이 결제창으로 전환 완료 (새로 열림)")
+                    except:
+                        log("새 창을 찾을 수 없음 - 현재 페이지에서 계속")
+                        new_page = page  # 현재 페이지 사용
+                
+                # 페이지 완전 로딩 대기
+                new_page.wait_for_load_state("networkidle")
+                time.sleep(2)  # 추가 대기
 
-                # 카톡결제 버튼 클릭
-                kakao_talk_pay = new_page.locator("xpath=/html/body/div/main/div/div[1]/div[4]/span")
-                kakao_talk_pay.wait_for(timeout=10000)
-                kakao_talk_pay.click()
-                log("카톡결제 버튼 클릭 완료")
+                # Tab 키로 카톡결제 탭으로 이동
+                log("Tab 키로 카톡결제 탭 선택 시도")
+                # Tab 2번 누르기 (QR결제 -> 카톡결제)
+                new_page.keyboard.press("Tab")
+                time.sleep(0.2)
+                new_page.keyboard.press("Tab")
+                time.sleep(0.2)
+                # 스페이스바 또는 엔터로 선택
+                new_page.keyboard.press("Enter")
+                log("카톡결제 탭 선택 완료")
+                
+                time.sleep(2)  # 탭/화면 전환 대기
 
                 # 휴대폰 번호 입력
-                phone_input = new_page.locator("xpath=/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[1]/div/div/span/input")
-                phone_input.fill("")
-                phone_input.fill(personal_info['phone'])
-                log("휴대폰 번호 입력 완료")
+                try:
+                    phone_input = new_page.locator("xpath=/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[1]/div/div/span/input")
+                    phone_input.wait_for(state="visible", timeout=5000)
+                    phone_input.fill(personal_info['phone'])
+                    log("휴대폰 번호 입력 완료")
+                except:
+                    log("휴대폰 번호 입력 실패")
 
                 # 생년월일 입력
-                birth_input = new_page.locator("xpath=/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[2]/div/div/span/input")
-                birth_input.fill("")
-                birth_input.fill(personal_info['birth'])
-                log("생년월일 입력 완료")
+                try:
+                    birth_input = new_page.locator("xpath=/html/body/div[1]/main/div/div[2]/div/div[2]/form/div[2]/div/div/span/input")
+                    birth_input.wait_for(state="visible", timeout=5000)
+                    birth_input.fill(personal_info['birth'])
+                    log("생년월일 입력 완료")
+                except:
+                    log("생년월일 입력 실패")
 
                 # 최종 결제요청 버튼 클릭
-                final_request_button = new_page.locator("xpath=/html/body/div[1]/main/div/div[2]/div/div[2]/form/button")
-                final_request_button.click()
-                log("최종 결제요청 완료")
+                try:
+                    # 레거시와 동일한 XPath 사용
+                    final_request_button = new_page.locator("xpath=/html/body/div[1]/main/div/div[2]/div/div[2]/form/button")
+                    final_request_button.wait_for(state="visible", timeout=5000)
+                    time.sleep(0.5)  # 버튼 활성화 대기
+                    final_request_button.click()
+                    log("최종 결제요청 완료")
+                except:
+                    log("결제요청 버튼 클릭 실패")
 
                 # 결제 완료 대기 (최대 10분)
                 try:
