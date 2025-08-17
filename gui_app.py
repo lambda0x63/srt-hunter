@@ -24,15 +24,38 @@ class SRTReservationWorker(QThread):
         self.context = None
         self.page = None
         self.is_running = True
+        self._stop_requested = False
     
     def stop(self):
         """안전하게 작업 중단"""
+        self._stop_requested = True
         self.is_running = False
+        
+        # 브라우저와 playwright를 즉시 종료
+        try:
+            if self.page:
+                self.page.close()
+            if self.context:
+                self.context.close()
+            if self.browser:
+                self.browser.close()
+            if self.playwright:
+                self.playwright.stop()
+        except:
+            pass
         
     def run(self):
         try:
+            if self._stop_requested:
+                return
+                
             from srt_automation import setup_driver, start_reservation
             self.playwright, self.browser, self.context, self.page = setup_driver()
+            
+            if self._stop_requested:
+                return
+                
+            # start_reservation_with_worker 대신 기존 함수 사용
             success = start_reservation(
                 self.playwright,
                 self.browser,
@@ -44,21 +67,35 @@ class SRTReservationWorker(QThread):
                 self.settings,
                 self.progress_signal
             )
-            self.finished_signal.emit(success)
+            
+            if not self._stop_requested:
+                self.finished_signal.emit(success)
         except Exception as e:
-            self.progress_signal.emit(f"❌ 오류 발생: {str(e)}")
-            self.finished_signal.emit(False)
+            if not self._stop_requested:
+                self.progress_signal.emit(f"❌ 오류 발생: {str(e)}")
+                self.finished_signal.emit(False)
         finally:
-            if self.browser:
-                try:
+            # 정리 작업
+            try:
+                if self.page:
+                    self.page.close()
+            except:
+                pass
+            try:
+                if self.context:
+                    self.context.close()
+            except:
+                pass
+            try:
+                if self.browser:
                     self.browser.close()
-                except:
-                    pass
-            if self.playwright:
-                try:
+            except:
+                pass
+            try:
+                if self.playwright:
                     self.playwright.stop()
-                except:
-                    pass
+            except:
+                pass
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -775,48 +812,38 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "예매 실패", "❌ 예매에 실패했습니다.")
     
     def reset_program(self):
-        # 진행 중인 작업이 있는지 확인
-        if hasattr(self, 'worker') and self.worker.isRunning():
-            self.log_text.append("⏹️ 중단 요청 중...")
-            
-            try:
-                # Playwright 브라우저 먼저 종료
-                if hasattr(self.worker, 'browser') and self.worker.browser:
-                    try:
-                        self.worker.browser.close()
-                    except:
-                        pass
-                
-                if hasattr(self.worker, 'playwright') and self.worker.playwright:
-                    try:
-                        self.worker.playwright.stop()
-                    except:
-                        pass
-                
-                # 쓰레드 종료
-                self.worker.stop()  # 플래그 설정
-                
-                # 최대 1초 대기
-                if not self.worker.wait(1000):
-                    self.worker.terminate()  # 강제 종료
-                    self.worker.wait(500)
-                    
-                    # 그래도 안 끝나면 quit
-                    if self.worker.isRunning():
-                        self.worker.quit()
-                
-            except Exception as e:
-                self.log_text.append(f"중단 중 오류: {str(e)}")
+        """프로그램 중단 - 비동기 처리로 UI 블로킹 방지"""
+        self.log_text.append("⏹️ 중단 요청을 처리하는 중...")
+        self.reset_button.setEnabled(False)  # 중복 클릭 방지
         
-        self.progress_bar.hide()
-        self.start_button.setEnabled(True)
-        self.reset_button.setEnabled(False)
-        self.status_label.setText("⚫ 중단됨")
-        self.status_label.setStyleSheet("""
-            font-size: 14px;
-            padding: 5px 10px;
-            background-color: #3c3c3c;
-            border-radius: 10px;
-            color: #999999;
-        """)
-        self.log_text.append("⏹️ 프로그램이 중단되었습니다.")
+        # QTimer를 사용해 비동기로 처리
+        QTimer.singleShot(0, self._do_reset)
+    
+    def _do_reset(self):
+        """실제 중단 작업 수행"""
+        try:
+            if hasattr(self, 'worker') and self.worker.isRunning():
+                # 워커에 중단 신호 보내기
+                self.worker.stop()
+                
+                # 워커가 종료될 때까지 최대 0.5초 대기
+                if not self.worker.wait(500):
+                    # 강제 종료
+                    self.worker.terminate()
+                    self.worker.wait(100)
+        except Exception as e:
+            self.log_text.append(f"중단 중 오류: {str(e)}")
+        finally:
+            # UI 상태 업데이트
+            self.progress_bar.hide()
+            self.start_button.setEnabled(True)
+            self.reset_button.setEnabled(False)
+            self.status_label.setText("⚫ 중단됨")
+            self.status_label.setStyleSheet("""
+                font-size: 14px;
+                padding: 5px 10px;
+                background-color: #3c3c3c;
+                border-radius: 10px;
+                color: #999999;
+            """)
+            self.log_text.append("⏹️ 프로그램이 중단되었습니다.")
